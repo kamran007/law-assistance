@@ -1,0 +1,166 @@
+import robotsParser from 'robots-parser';
+import { fetch as undiciFetch } from 'undici';
+import { IntervalLimiter } from './rate-limiter';
+import type { SourceConfig } from './source-config';
+
+/** The subset of fetch this client needs; lets tests inject a fake without network access. */
+export type FetchLike = (
+  url: string,
+  init: { headers: Record<string, string>; signal: AbortSignal },
+) => Promise<{ status: number; headers: { get(name: string): string | null }; text(): Promise<string> }>;
+
+export interface Validators {
+  etag?: string;
+  lastModified?: string;
+}
+
+/** Stores ETag / Last-Modified per URL so the nightly crawl can use conditional GET. */
+export interface ConditionalCache {
+  get(url: string): Promise<Validators | undefined>;
+  set(url: string, v: Validators): Promise<void>;
+}
+
+export class MemoryConditionalCache implements ConditionalCache {
+  private readonly map = new Map<string, Validators>();
+  async get(url: string) {
+    return this.map.get(url);
+  }
+  async set(url: string, v: Validators) {
+    this.map.set(url, v);
+  }
+}
+
+export type FetchResult =
+  | { kind: 'ok'; url: string; body: string; fetchedAt: Date; validators: Validators }
+  | { kind: 'not-modified'; url: string; fetchedAt: Date };
+
+export class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly url: string,
+  ) {
+    super(`HTTP ${status} for ${url}`);
+    this.name = 'HttpError';
+  }
+}
+
+export class RobotsDisallowedError extends Error {
+  constructor(public readonly url: string) {
+    super(`robots.txt disallows ${url}`);
+    this.name = 'RobotsDisallowedError';
+  }
+}
+
+export interface PoliteHttpClientOptions {
+  config: SourceConfig;
+  fetch?: FetchLike;
+  limiter?: IntervalLimiter;
+  cache?: ConditionalCache;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+  now?: () => Date;
+}
+
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const MAX_BACKOFF_MS = 60_000;
+
+/**
+ * HTTP client for the portal (TRD §6.1): one shared 1 req/s limiter, robots.txt honoured,
+ * conditional GET, exponential backoff with jitter on 5xx/429/timeouts/network errors.
+ * Every attempt, including retries and the robots.txt fetch, goes through the limiter.
+ */
+export class PoliteHttpClient {
+  private readonly cfg: SourceConfig;
+  private readonly doFetch: FetchLike;
+  private readonly limiter: IntervalLimiter;
+  private readonly cache: ConditionalCache;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly random: () => number;
+  private readonly now: () => Date;
+  private robots: Promise<ReturnType<typeof robotsParser>> | undefined;
+
+  constructor(opts: PoliteHttpClientOptions) {
+    this.cfg = opts.config;
+    this.doFetch = opts.fetch ?? (undiciFetch as unknown as FetchLike);
+    this.limiter = opts.limiter ?? new IntervalLimiter(opts.config.minIntervalMs);
+    this.cache = opts.cache ?? new MemoryConditionalCache();
+    this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.random = opts.random ?? Math.random;
+    this.now = opts.now ?? (() => new Date());
+  }
+
+  /** Fetches a page. `conditional: false` forces a full download (weekly full re-crawl). */
+  async get(url: string, opts: { conditional?: boolean } = {}): Promise<FetchResult> {
+    if (!(await this.isAllowed(url))) throw new RobotsDisallowedError(url);
+    const headers: Record<string, string> = { 'user-agent': this.cfg.userAgent, accept: 'text/html' };
+    if (opts.conditional !== false) {
+      const v = await this.cache.get(url);
+      if (v?.etag) headers['if-none-match'] = v.etag;
+      if (v?.lastModified) headers['if-modified-since'] = v.lastModified;
+    }
+    const res = await this.request(url, headers);
+    const fetchedAt = this.now();
+    if (res.status === 304) return { kind: 'not-modified', url, fetchedAt };
+    const body = await res.text();
+    const validators: Validators = {};
+    const etag = res.headers.get('etag');
+    const lastModified = res.headers.get('last-modified');
+    if (etag) validators.etag = etag;
+    if (lastModified) validators.lastModified = lastModified;
+    if (etag || lastModified) await this.cache.set(url, validators);
+    return { kind: 'ok', url, body, fetchedAt, validators };
+  }
+
+  private async request(url: string, headers: Record<string, string>) {
+    for (let attempt = 0; ; attempt++) {
+      await this.limiter.acquire();
+      let retryAfterMs: number | undefined;
+      try {
+        const res = await this.doFetch(url, { headers, signal: AbortSignal.timeout(this.cfg.requestTimeoutMs) });
+        if (res.status === 200 || res.status === 304) return res;
+        if (!RETRYABLE_STATUS.has(res.status) || attempt >= this.cfg.maxRetries) throw new HttpError(res.status, url);
+        retryAfterMs = parseRetryAfter(res.headers.get('retry-after'));
+      } catch (err) {
+        if (err instanceof HttpError) throw err;
+        // Network errors, resets and timeouts are retryable.
+        if (attempt >= this.cfg.maxRetries) throw err;
+      }
+      await this.sleep(retryAfterMs ?? this.backoff(attempt));
+    }
+  }
+
+  private backoff(attempt: number): number {
+    const base = Math.min(MAX_BACKOFF_MS, 2000 * 2 ** attempt);
+    return Math.round(base / 2 + this.random() * (base / 2)); // "equal jitter"
+  }
+
+  private async isAllowed(url: string): Promise<boolean> {
+    this.robots ??= this.loadRobots();
+    const robots = await this.robots;
+    return robots.isAllowed(url, this.cfg.userAgent) ?? true;
+  }
+
+  private async loadRobots() {
+    const robotsUrl = new URL('/robots.txt', this.cfg.baseUrl).toString();
+    let body = '';
+    try {
+      const res = await this.request(robotsUrl, { 'user-agent': this.cfg.userAgent });
+      body = await res.text();
+    } catch (err) {
+      // A missing robots.txt (4xx) means no restrictions. Anything else (unreachable) is fatal for
+      // this run: we do not crawl without knowing the rules. The next run tries again.
+      if (!(err instanceof HttpError && err.status >= 400 && err.status < 500)) {
+        this.robots = undefined;
+        throw err;
+      }
+    }
+    return robotsParser(robotsUrl, body);
+  }
+}
+
+function parseRetryAfter(v: string | null): number | undefined {
+  if (!v) return undefined;
+  const secs = Number(v);
+  if (Number.isFinite(secs) && secs >= 0) return Math.min(MAX_BACKOFF_MS, secs * 1000);
+  return undefined;
+}
