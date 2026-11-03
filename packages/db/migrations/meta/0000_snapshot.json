@@ -1,0 +1,1982 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "81cbe50c-f624-483a-a491-bddd0bafb92a",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "credential_reviews": {
+      "name": "credential_reviews",
+      "columns": {
+        "review_id": {
+          "name": "review_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reviewer_user_id": {
+          "name": "reviewer_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "decision": {
+          "name": "decision",
+          "type": "enum('APPROVED','REJECTED')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "credential_reviews_user_id_users_user_id_fk": {
+          "name": "credential_reviews_user_id_users_user_id_fk",
+          "tableFrom": "credential_reviews",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "credential_reviews_reviewer_user_id_users_user_id_fk": {
+          "name": "credential_reviews_reviewer_user_id_users_user_id_fk",
+          "tableFrom": "credential_reviews",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewer_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "credential_reviews_review_id": {
+          "name": "credential_reviews_review_id",
+          "columns": [
+            "review_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "otp_challenges": {
+      "name": "otp_challenges",
+      "columns": {
+        "challenge_id": {
+          "name": "challenge_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_identifier": {
+          "name": "contact_identifier",
+          "type": "varchar(254)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "enum('SMS','EMAIL')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "ix_otp_contact_created": {
+          "name": "ix_otp_contact_created",
+          "columns": [
+            "contact_identifier",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "otp_challenges_challenge_id": {
+          "name": "otp_challenges_challenge_id",
+          "columns": [
+            "challenge_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "refresh_tokens": {
+      "name": "refresh_tokens",
+      "columns": {
+        "token_id": {
+          "name": "token_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "family_id": {
+          "name": "family_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "uq_refresh_hash": {
+          "name": "uq_refresh_hash",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        },
+        "ix_refresh_family": {
+          "name": "ix_refresh_family",
+          "columns": [
+            "family_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "refresh_tokens_user_id_users_user_id_fk": {
+          "name": "refresh_tokens_user_id_users_user_id_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "refresh_tokens_token_id": {
+          "name": "refresh_tokens_token_id",
+          "columns": [
+            "token_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_identifier": {
+          "name": "contact_identifier",
+          "type": "varchar(254)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "enum('CITIZEN','LAWYER','JUDGE','ADMIN')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'CITIZEN'"
+        },
+        "requested_role": {
+          "name": "requested_role",
+          "type": "enum('CITIZEN','LAWYER','JUDGE','ADMIN')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'CITIZEN'"
+        },
+        "verification_credential": {
+          "name": "verification_credential",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "enum('NOT_REQUIRED','PENDING','VERIFIED','REJECTED')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'NOT_REQUIRED'"
+        },
+        "preferred_language": {
+          "name": "preferred_language",
+          "type": "enum('BN','EN')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'BN'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_users_contact": {
+          "name": "uq_users_contact",
+          "columns": [
+            "contact_identifier"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "users_user_id": {
+          "name": "users_user_id",
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "crpc_schedule_metadata": {
+      "name": "crpc_schedule_metadata",
+      "columns": {
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "statute_id": {
+          "name": "statute_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "section_number": {
+          "name": "section_number",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "offense_description": {
+          "name": "offense_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_cognizable": {
+          "name": "is_cognizable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_bailable": {
+          "name": "is_bailable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_compoundable": {
+          "name": "is_compoundable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "max_punishment": {
+          "name": "max_punishment",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "triable_by_court": {
+          "name": "triable_by_court",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_reference": {
+          "name": "source_reference",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_by": {
+          "name": "verified_by",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "uq_schedule_section_from": {
+          "name": "uq_schedule_section_from",
+          "columns": [
+            "statute_id",
+            "section_number",
+            "effective_from"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "crpc_schedule_metadata_statute_id_statutes_statute_id_fk": {
+          "name": "crpc_schedule_metadata_statute_id_statutes_statute_id_fk",
+          "tableFrom": "crpc_schedule_metadata",
+          "tableTo": "statutes",
+          "columnsFrom": [
+            "statute_id"
+          ],
+          "columnsTo": [
+            "statute_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "crpc_schedule_metadata_schedule_id": {
+          "name": "crpc_schedule_metadata_schedule_id",
+          "columns": [
+            "schedule_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "section_chunks": {
+      "name": "section_chunks",
+      "columns": {
+        "chunk_id": {
+          "name": "chunk_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "section_id": {
+          "name": "section_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chunk_index": {
+          "name": "chunk_index",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chunk_text": {
+          "name": "chunk_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "embedding_model": {
+          "name": "embedding_model",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "indexed_at": {
+          "name": "indexed_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "uq_chunks_section_idx": {
+          "name": "uq_chunks_section_idx",
+          "columns": [
+            "section_id",
+            "chunk_index"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "section_chunks_section_id_statute_sections_section_id_fk": {
+          "name": "section_chunks_section_id_statute_sections_section_id_fk",
+          "tableFrom": "section_chunks",
+          "tableTo": "statute_sections",
+          "columnsFrom": [
+            "section_id"
+          ],
+          "columnsTo": [
+            "section_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "section_chunks_chunk_id": {
+          "name": "section_chunks_chunk_id",
+          "columns": [
+            "chunk_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "statute_sections": {
+      "name": "statute_sections",
+      "columns": {
+        "section_id": {
+          "name": "section_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "statute_id": {
+          "name": "statute_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "chapter_reference": {
+          "name": "chapter_reference",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "section_number": {
+          "name": "section_number",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "normalized_section_key": {
+          "name": "normalized_section_key",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "marginal_heading": {
+          "name": "marginal_heading",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_body": {
+          "name": "content_body",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amendment_footnotes": {
+          "name": "amendment_footnotes",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "footnotes_hash": {
+          "name": "footnotes_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version_number": {
+          "name": "version_number",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_current": {
+          "name": "is_current",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "valid_from_source": {
+          "name": "valid_from_source",
+          "type": "enum('AMENDMENT_FOOTNOTE','ENACTMENT_DATE','DETECTED_ON_SYNC')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "current_key": {
+          "name": "current_key",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "IF(is_current, CONCAT(HEX(statute_id), ':', normalized_section_key), NULL)",
+            "type": "stored"
+          }
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "uq_sections_current_key": {
+          "name": "uq_sections_current_key",
+          "columns": [
+            "current_key"
+          ],
+          "isUnique": true
+        },
+        "uq_sections_version": {
+          "name": "uq_sections_version",
+          "columns": [
+            "statute_id",
+            "normalized_section_key",
+            "version_number"
+          ],
+          "isUnique": true
+        },
+        "ix_sections_point_in_time": {
+          "name": "ix_sections_point_in_time",
+          "columns": [
+            "statute_id",
+            "normalized_section_key",
+            "valid_from",
+            "valid_to"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "statute_sections_statute_id_statutes_statute_id_fk": {
+          "name": "statute_sections_statute_id_statutes_statute_id_fk",
+          "tableFrom": "statute_sections",
+          "tableTo": "statutes",
+          "columnsFrom": [
+            "statute_id"
+          ],
+          "columnsTo": [
+            "statute_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "statute_sections_section_id": {
+          "name": "statute_sections_section_id",
+          "columns": [
+            "section_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "statutes": {
+      "name": "statutes",
+      "columns": {
+        "statute_id": {
+          "name": "statute_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "bdlaws_act_id": {
+          "name": "bdlaws_act_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "act_number": {
+          "name": "act_number",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "title_en": {
+          "name": "title_en",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "title_bn": {
+          "name": "title_bn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "language": {
+          "name": "language",
+          "type": "enum('BN','EN')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enacted_date": {
+          "name": "enacted_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('ACTIVE','REPEALED')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ACTIVE'"
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "raw_html_s3_key": {
+          "name": "raw_html_s3_key",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "uq_statutes_bdlaws_act": {
+          "name": "uq_statutes_bdlaws_act",
+          "columns": [
+            "bdlaws_act_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "statutes_statute_id": {
+          "name": "statutes_statute_id",
+          "columns": [
+            "statute_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "artifact_revisions": {
+      "name": "artifact_revisions",
+      "columns": {
+        "revision_id": {
+          "name": "revision_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "editable_document_html": {
+          "name": "editable_document_html",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_device": {
+          "name": "created_by_device",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "ix_revisions_owner_artifact": {
+          "name": "ix_revisions_owner_artifact",
+          "columns": [
+            "owner_user_id",
+            "artifact_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "artifact_revisions_artifact_id_case_artifacts_artifact_id_fk": {
+          "name": "artifact_revisions_artifact_id_case_artifacts_artifact_id_fk",
+          "tableFrom": "artifact_revisions",
+          "tableTo": "case_artifacts",
+          "columnsFrom": [
+            "artifact_id"
+          ],
+          "columnsTo": [
+            "artifact_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "artifact_revisions_revision_id": {
+          "name": "artifact_revisions_revision_id",
+          "columns": [
+            "revision_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "case_artifacts": {
+      "name": "case_artifacts",
+      "columns": {
+        "artifact_id": {
+          "name": "artifact_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "case_file_id": {
+          "name": "case_file_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "artifact_type": {
+          "name": "artifact_type",
+          "type": "enum('FIR_SCAN','CHARGE_SHEET','SEIZURE_LIST','COURT_ORDER','VOICE_DICTATION_DRAFT','COURT_ORDER_NOTE','GD_DRAFT')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "template_key": {
+          "name": "template_key",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "file_storage_key": {
+          "name": "file_storage_key",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "file_sha256": {
+          "name": "file_sha256",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "page_count": {
+          "name": "page_count",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "processing_status": {
+          "name": "processing_status",
+          "type": "enum('UPLOADED','OCR','EXTRACTING','SCHEDULE_LOOKUP','ANALYZING','READY','FAILED')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "processing_error": {
+          "name": "processing_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ocr_confidence": {
+          "name": "ocr_confidence",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "raw_extracted_text": {
+          "name": "raw_extracted_text",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "structured_analysis": {
+          "name": "structured_analysis",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "role_analysis": {
+          "name": "role_analysis",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "editable_document_html": {
+          "name": "editable_document_html",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_artifacts_owner_case": {
+          "name": "ix_artifacts_owner_case",
+          "columns": [
+            "owner_user_id",
+            "case_file_id"
+          ],
+          "isUnique": false
+        },
+        "ix_artifacts_owner_updated": {
+          "name": "ix_artifacts_owner_updated",
+          "columns": [
+            "owner_user_id",
+            "updated_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "case_artifacts_case_file_id_case_files_case_file_id_fk": {
+          "name": "case_artifacts_case_file_id_case_files_case_file_id_fk",
+          "tableFrom": "case_artifacts",
+          "tableTo": "case_files",
+          "columnsFrom": [
+            "case_file_id"
+          ],
+          "columnsTo": [
+            "case_file_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "case_artifacts_artifact_id": {
+          "name": "case_artifacts_artifact_id",
+          "columns": [
+            "artifact_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "case_files": {
+      "name": "case_files",
+      "columns": {
+        "case_file_id": {
+          "name": "case_file_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "case_number": {
+          "name": "case_number",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "court_or_thana": {
+          "name": "court_or_thana",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "alleged_offense_date": {
+          "name": "alleged_offense_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_cases_owner_updated": {
+          "name": "ix_cases_owner_updated",
+          "columns": [
+            "owner_user_id",
+            "updated_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "case_files_owner_user_id_users_user_id_fk": {
+          "name": "case_files_owner_user_id_users_user_id_fk",
+          "tableFrom": "case_files",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "case_files_case_file_id": {
+          "name": "case_files_case_file_id",
+          "columns": [
+            "case_file_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "conversations": {
+      "name": "conversations",
+      "columns": {
+        "conversation_id": {
+          "name": "conversation_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "case_file_id": {
+          "name": "case_file_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "language": {
+          "name": "language",
+          "type": "enum('BN','EN')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'BN'"
+        },
+        "summary": {
+          "name": "summary",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_conversations_case": {
+          "name": "uq_conversations_case",
+          "columns": [
+            "case_file_id"
+          ],
+          "isUnique": true
+        },
+        "ix_conversations_owner_updated": {
+          "name": "ix_conversations_owner_updated",
+          "columns": [
+            "owner_user_id",
+            "updated_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "conversations_owner_user_id_users_user_id_fk": {
+          "name": "conversations_owner_user_id_users_user_id_fk",
+          "tableFrom": "conversations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "conversations_case_file_id_case_files_case_file_id_fk": {
+          "name": "conversations_case_file_id_case_files_case_file_id_fk",
+          "tableFrom": "conversations",
+          "tableTo": "case_files",
+          "columnsFrom": [
+            "case_file_id"
+          ],
+          "columnsTo": [
+            "case_file_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "conversations_conversation_id": {
+          "name": "conversations_conversation_id",
+          "columns": [
+            "conversation_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "messages": {
+      "name": "messages",
+      "columns": {
+        "message_id": {
+          "name": "message_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "enum('USER','ASSISTANT')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input_mode": {
+          "name": "input_mode",
+          "type": "enum('TEXT','VOICE')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'TEXT'"
+        },
+        "attached_artifact_id": {
+          "name": "attached_artifact_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "citations": {
+          "name": "citations",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retrieval_trace": {
+          "name": "retrieval_trace",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "law_as_of_date": {
+          "name": "law_as_of_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "input_tokens": {
+          "name": "input_tokens",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "output_tokens": {
+          "name": "output_tokens",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "latency_ms": {
+          "name": "latency_ms",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('COMPLETE','INTERRUPTED','NO_PROVISION','ERROR')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'COMPLETE'"
+        },
+        "flags": {
+          "name": "flags",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "ix_messages_conversation_created": {
+          "name": "ix_messages_conversation_created",
+          "columns": [
+            "conversation_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "ix_messages_owner": {
+          "name": "ix_messages_owner",
+          "columns": [
+            "owner_user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "messages_conversation_id_conversations_conversation_id_fk": {
+          "name": "messages_conversation_id_conversations_conversation_id_fk",
+          "tableFrom": "messages",
+          "tableTo": "conversations",
+          "columnsFrom": [
+            "conversation_id"
+          ],
+          "columnsTo": [
+            "conversation_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "messages_attached_artifact_id_case_artifacts_artifact_id_fk": {
+          "name": "messages_attached_artifact_id_case_artifacts_artifact_id_fk",
+          "tableFrom": "messages",
+          "tableTo": "case_artifacts",
+          "columnsFrom": [
+            "attached_artifact_id"
+          ],
+          "columnsTo": [
+            "artifact_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "messages_message_id": {
+          "name": "messages_message_id",
+          "columns": [
+            "message_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "audit_log": {
+      "name": "audit_log",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity": {
+          "name": "entity",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "details": {
+          "name": "details",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "ix_audit_entity": {
+          "name": "ix_audit_entity",
+          "columns": [
+            "entity",
+            "entity_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "audit_log_id": {
+          "name": "audit_log_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "outbox_events": {
+      "name": "outbox_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "aggregate": {
+          "name": "aggregate",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "aggregate_id": {
+          "name": "aggregate_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_outbox_unprocessed": {
+          "name": "ix_outbox_unprocessed",
+          "columns": [
+            "processed_at",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "outbox_events_id": {
+          "name": "outbox_events_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "scrape_events": {
+      "name": "scrape_events",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "bdlaws_act_id": {
+          "name": "bdlaws_act_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "enum('INFO','WARN','ERROR')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "indexes": {
+        "ix_scrape_events_run": {
+          "name": "ix_scrape_events_run",
+          "columns": [
+            "run_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "scrape_events_run_id_scrape_runs_run_id_fk": {
+          "name": "scrape_events_run_id_scrape_runs_run_id_fk",
+          "tableFrom": "scrape_events",
+          "tableTo": "scrape_runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "run_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scrape_events_event_id": {
+          "name": "scrape_events_event_id",
+          "columns": [
+            "event_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "scrape_runs": {
+      "name": "scrape_runs",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "enum('NIGHTLY','FULL','MANUAL')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('RUNNING','SUCCEEDED','FAILED','QUARANTINED')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'RUNNING'"
+        },
+        "acts_checked": {
+          "name": "acts_checked",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sections_changed": {
+          "name": "sections_changed",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP(3)"
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "scrape_runs_run_id": {
+          "name": "scrape_runs_run_id",
+          "columns": [
+            "run_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}

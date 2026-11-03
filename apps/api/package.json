@@ -1,0 +1,21 @@
+{
+  "name": "@lawassist/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.0",
+    "@fastify/helmet": "^13.2.0",
+    "@lawassist/config": "workspace:*",
+    "@lawassist/db": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.8",
+    "fastify-type-provider-zod": "^7.0.0",
+    "zod": "^4.6.7"
+  }
+}
