@@ -1,11 +1,16 @@
 import { parseArgs } from 'node:util';
 import { createWorkerContext } from './context';
+import { ensureChunkCollection, reindexAll } from './index/collection';
+import { drainOutbox } from './index/outbox';
 import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
 
 /**
- * Manual scraper runs (no queue):
- *   pnpm --filter @lawassist/worker scrape -- --acts 11,75 [--full] [--force]
- *   pnpm --filter @lawassist/worker scrape -- --act 11 --snapshot raw/bdlaws/11/....html.gz
+ * Manual runs (no queue):
+ *   scrape -- --acts 11,75 [--full] [--force]          crawl specific Acts
+ *   scrape -- --act 11 --snapshot raw/bdlaws/11/…gz     re-sync a stored snapshot
+ *   scrape -- --setup-index                             create Qdrant collection + alias + payload indexes
+ *   scrape -- --drain-outbox                            embed/index pending outbox events now
+ *   scrape -- --reindex-all [--keep-previous]           rebuild the collection, swap the alias
  */
 const { values } = parseArgs({
   // pnpm may forward the "--" separator; drop it so options after it still parse.
@@ -16,15 +21,31 @@ const { values } = parseArgs({
     snapshot: { type: 'string' },
     full: { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
+    'setup-index': { type: 'boolean', default: false },
+    'drain-outbox': { type: 'boolean', default: false },
+    'reindex-all': { type: 'boolean', default: false },
+    'keep-previous': { type: 'boolean', default: false },
   },
 });
 
 const ctx = createWorkerContext();
+const print = (v: unknown) => console.log(JSON.stringify(v, null, 2));
 try {
-  if (values.snapshot) {
+  if (values['setup-index']) {
+    print({ collection: await ensureChunkCollection(ctx.qdrant, ctx.cfg.QDRANT_COLLECTION, ctx.embedder.dimensions, ctx.log) });
+  } else if (values['drain-outbox']) {
+    print(await drainOutbox({ db: ctx.db, indexer: ctx.indexer, log: ctx.log }));
+  } else if (values['reindex-all']) {
+    print(
+      await reindexAll(
+        { db: ctx.db, client: ctx.qdrant, embedder: ctx.embedder, alias: ctx.cfg.QDRANT_COLLECTION, log: ctx.log },
+        { keepPrevious: values['keep-previous'] },
+      ),
+    );
+  } else if (values.snapshot) {
     if (!values.act) throw new Error('--snapshot needs --act');
     const out = await syncFromSnapshot(ctx.scrape, Number(values.act), values.snapshot, values.force);
-    console.log(JSON.stringify(out.kind === 'synced' ? out.result : out, null, 2));
+    print(out.kind === 'synced' ? out.result : out);
   } else {
     const actIds = values.acts?.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
     const summary = await runScrape(ctx.scrape, {
@@ -32,7 +53,7 @@ try {
       ...(actIds?.length ? { actIds } : {}),
       force: values.force,
     });
-    console.log(JSON.stringify(summary, null, 2));
+    print(summary);
     process.exitCode = summary.status === 'FAILED' ? 1 : 0;
   }
 } finally {

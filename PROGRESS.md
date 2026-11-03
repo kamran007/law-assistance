@@ -3,7 +3,7 @@
 Live status of the build. Task IDs come from [docs/implementation_plan.md](docs/implementation_plan.md), which carries the matching checkboxes.
 Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ not started · ⛔ blocked
 
-**Current sprint:** S1 (Weeks 1–2) — Foundations & Scraper
+**Current sprint:** S2 (Weeks 3–4) — Corpus Live, Auth & Retrieval Core. S1 code is merged; S1 leftovers: DATA-01 live check, BE-02 grants test, OPS-02
 **Last updated:** 2026-11-03
 
 ---
@@ -27,6 +27,15 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | DATA-05 | Versioning transaction + outbox | ✅ | `versioning.ts`: read-only plan, then 20% safety valve (quarantine, nothing written), then one REPEATABLE READ tx per section with `FOR UPDATE` + outbox (CREATED / CLOSED / NOTIFY_AFFECTED_CASES / STATUTE_STATUS_CHANGED), retry on dup-key/deadlock. **Verified on GitHub Actions 2026-11-03:** `versioning.int.test.ts` 10/10 passed against MySQL 8.4 (amend → archive → new current, 4 concurrent workers, concurrent first ingest, safety valve, removal, repeal, Sprint 1 demo via `runScrape`). Plan logic: 10 unit tests |
 | — | API skeleton (early part of BE-05) | ✅ | `apps/api`: Fastify + Zod, helmet, CORS, RFC 9457 errors, `/health`, `/ready`, log redaction; 5 tests |
 
+## Sprint 2 status
+
+| ID | Task | Status | Evidence / Notes |
+| :--- | :--- | :---: | :--- |
+| DATA-06 | Chunker + outbox worker → TEI → Qdrant | 🟡 | Branch `feature/data-embedding`. `apps/worker/src/index/{chunker,indexer,outbox}.ts` + `packages/providers` (TEI client, Qdrant chunk index). Chunks: 350–500 est. tokens, split on sub-section/proviso/explanation, Act/section heading prefixed. Deterministic chunk ids (UUID v8 of section_id + index). All writes re-read MySQL, so replays converge. Unchanged chunks get a payload-only refresh, no re-embed. Failures: attempts + `last_error` (no text), parked after 10. Outbox drained every 15 s (BullMQ, concurrency 1). 18 unit tests (chunker, TEI client, filters). `index.int.test.ts` (MySQL + Qdrant 1.15: index, **replay idempotent**, point-in-time filters incl. `valid_to` boundary, repeal propagation, failure/retry) **written, not run yet: first run on the PR's CI** |
+| DATA-07 | Qdrant collection setup + `reindex --all` | 🟡 | `collection.ts`: alias `section_chunks` → physical `section_chunks_<ts>`, 1024-dim cosine, HNSW m=16/ef_construct=128, payload indexes (is_current, valid_from/to datetime, statute_id, section_id, act_status). `reindexAll` rebuilds all versions from MySQL, catches up on sections changed during the rebuild, swaps the alias, drops the old collection. CLI: `--setup-index`, `--reindex-all`, `--drain-outbox`. Covered by `index.int.test.ts` (not run yet) |
+| DATA-08 | Ingest top 50 Acts | ⛔ | Needs DATA-01 (portal reachable) and TEI running (`docker compose --profile ml`) |
+| DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
+
 ## Verification snapshot (2026-11-03)
 
 | Check | Result |
@@ -44,7 +53,7 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 1. **Start Docker Desktop** for local integration runs and OPS-02 (`docker compose up`). CI already runs the integration tests.
 2. **bdlaws unreachable from the dev network** (DATA-01). Try another network or a VPN egress in BD. Without it, the parser selectors stay unverified.
 3. **PRE-01: rotate the AI relay API key** that was pasted into chat. Store new keys only in `.env` (git-ignored) or Secrets Manager.
-4. **`main` CI `security` job is red** until `fix/semgrep-findings` is merged. Open that PR, confirm green, merge.
+4. `main` CI fully green since PR #3 (`46856b0`).
 5. RDS later needs `log_bin_trust_function_creators=1` so migrations can create triggers (noted in `grants.sql`).
 
 ## Decisions made during build
@@ -64,12 +73,20 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | 2026-11-03 | Crawler refuses to run when robots.txt is unreachable (4xx = allow all). Run aborts after 5 consecutive network failures | Don't crawl without knowing the rules; don't log 1,480 identical failures |
 | 2026-11-03 | DB-constraint tests assert on the driver error (`err.cause`: errno + message), not on Drizzle's wrapper message | Drizzle 0.45 wraps driver errors in `DrizzleQueryError`; errno is also stricter than message matching |
 | 2026-11-03 | Semgrep warnings get fixed, not suppressed, where cheap. A `nosemgrep` needs a rule id and a reason in the comment | Keeps the full-repo scan on `main` meaningful |
+| 2026-11-03 | New `packages/providers` (TRD §3.2): `EmbeddingProvider` (TEI) + `ChunkIndex` (Qdrant) with point-in-time filters built in | Business logic stays vendor-neutral; BE-07 retrieval reuses the same filter builder |
+| 2026-11-03 | Qdrant client pinned to **1.15.1** (exact) to match the `qdrant/qdrant:v1.15.4` server | The client warns or fails beyond one minor version of skew; bump both together |
+| 2026-11-03 | Chunk ids are deterministic (UUID v8 from `section_id` + index); chunk rows are replaced per section in one tx | Same Qdrant point ids on every replay or reindex → idempotent by construction |
+| 2026-11-03 | Outbox handlers ignore event payloads and re-read MySQL | Replays, duplicates and reordering converge on the source of truth (TRD §4.4) |
+| 2026-11-03 | Point-in-time filter is `valid_from ≤ d < valid_to` (`valid_to` exclusive) | The amendment date belongs to the new version; matches the versioning transaction |
+| 2026-11-03 | Token counts are a heuristic (EN 1.3/word, BN 2.2/word, digits/punct 1), not a real tokenizer | No JS tokenizer for bge-m3. Size only affects granularity; TEI truncates over-long input, so no text is lost |
+| 2026-11-03 | Outbox consumer handles only index events. `NOTIFY_AFFECTED_CASES` stays unprocessed for the future notification consumer | One `processed_at` column per event; separate consumers by event type |
 | 2026-11-03 | `msgpackr-extract` native build disabled (`allowBuilds: false`) | Optional BullMQ speed-up; pure-JS fallback is fine |
 | 2026-11-03 | Bangla sub-section letters map ক→A, খ→B, … in consonant order | Matches inserted-section convention (৩২৬ক = 326A). **LEGAL to confirm beyond ঙ** |
 
 ## Next steps (in order)
 
-1. Merge `fix/semgrep-findings` (makes `main` fully green, closes OPS-03). Add a grants test to close BE-02.
+1. Open the PR for `feature/data-embedding` and check its CI (first run of `index.int.test.ts`); merge when green. Closes DATA-06/07 and OPS-03 (green PR pipeline).
+1a. Add a grants test to close BE-02.
 2. DATA-01: from a network that reaches bdlaws, save the 10 spike Acts as fixtures, then correct selectors and URL patterns (checklist in `apps/worker/src/scrape/README.md`).
 3. Run the Sprint 1 demo for real: `docker compose up -d` → `pnpm db:migrate` → `pnpm --filter @lawassist/worker scrape -- --acts <10 ids>` twice → edit a snapshot → `--act <id> --snapshot <key>`.
 4. Then Sprint 2: DATA-06 chunker + outbox worker → TEI → Qdrant.
