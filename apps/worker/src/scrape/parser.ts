@@ -56,8 +56,12 @@ export interface ParsedAct {
 const BN_LETTER = /\p{Script=Bengali}/gu;
 const LATIN_LETTER = /[A-Za-z]/g;
 
-/** "420." / "৪২০।" / "[326A." / "561A -" at the start of a section body. */
-const SECTION_NUMBER = /^\s*[[(]?\s*([0-9০-৯]{1,4}\s*[A-Zক-ঞ]{0,2})\s*[.।:-]/u;
+/**
+ * "420." / "৪২০।" / "[326A." / "561 A -" at the start of a section body. Inputs are already trimmed
+ * and whitespace-collapsed. The pattern is anchored with bounded quantifiers and no two unbounded
+ * quantifiers over the same characters, so matching is linear (no ReDoS).
+ */
+const SECTION_NUMBER = /^[[(]?\s?([0-9০-৯]{1,4}\s?[A-Zক-ঞ]{0,2})\s?[.।:-]/u;
 const SUBSECTION = /^\(\s*([0-9০-৯]{1,3}[a-zক-ঞ]?)\s*\)/u;
 const PROVISO = /^(?:\[?\s*Provided\b|তবে শর্ত)/u;
 const EXPLANATION = /^(?:\[?\s*Explanation\b|ব্যাখ্যা)/u;
@@ -203,6 +207,7 @@ function paragraphs($: cheerio.CheerioAPI, el: Cheerio<AnyNode>): string[] {
 
 function splitParts(lines: string[]): SectionPart[] {
   return lines.map((line, idx) => {
+    // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- SECTION_NUMBER is linear-time (see its definition)
     const text = idx === 0 ? line.replace(SECTION_NUMBER, '').trim() : line;
     const sub = SUBSECTION.exec(text);
     if (sub) return { kind: 'SUBSECTION', label: `(${sub[1]})`, text };

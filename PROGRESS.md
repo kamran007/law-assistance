@@ -14,11 +14,11 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | :--- | :--- | :---: | :--- |
 | OPS-01 | Monorepo layout | 🟡 | pnpm workspace with `apps/{api,worker}`, `packages/{config,legal-text,db}`. Still missing: `apps/web`, `packages/{contracts,providers,prompts}`, `mobile/`, `infra/`, `evals/` (created when their tasks start) |
 | OPS-02 | docker-compose | 🟡 | `docker-compose.yml` written (mysql 8.4 + ngram, redis, qdrant, minio, TEI under `--profile ml`). **Not yet run: Docker Desktop was not running** |
-| OPS-03 | CI pipeline | 🟡 | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). Remote `origin` = github.com/kamran007/law-assistance (2026-11-03). First CI run: PR #1 (merged to `main`). Lint, typecheck and unit tests pass. 3 db.int assertions failed (test bug, see verification snapshot); fix on `fix/db-int-error-assertions`. Trivy is added when Docker images exist |
+| OPS-03 | CI pipeline | 🟡 | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). Remote `origin` = github.com/kamran007/law-assistance. Run on `main` @ `c8d5f1f`: `check` job all green incl. integration; `security` job red, because Semgrep found 2 warnings that PRs (diff-only scan) didn't show. Fixed on `fix/semgrep-findings` (local Semgrep 1.183, same rulesets: 0 findings). Done when a PR shows green in < 10 min. Trivy is added when Docker images exist |
 | OPS-04 | Terraform base | ⬜ | |
 | OPS-05 | Zod-validated config | ✅ | `packages/config`; 5 tests; errors never echo secret values; secrets required in staging/prod |
-| BE-01 | Drizzle schema (17 tables) | 🟡 | `packages/db/src/schema/*`, migrations `0000_init.sql` + `0001_fulltext_and_triggers.sql`. Type-checks. **Applying to real MySQL is pending (needs Docker)** |
-| BE-02 | DB grants + citizen trigger | 🟡 | `packages/db/sql/grants.sql` (per-table, append-only `audit_log`); trigger in migration 0001. Covered by `db.int.test.ts`, not yet run |
+| BE-01 | Drizzle schema (17 tables) | ✅ | `packages/db/src/schema/*`, migrations `0000_init.sql` + `0001_fulltext_and_triggers.sql`. **Verified on CI (`main` @ `c8d5f1f`):** migrations apply cleanly to empty MySQL 8.4; `db.int.test.ts` 9/9 (one-current-version index, ngram FULLTEXT, tenant isolation, optimistic concurrency) |
+| BE-02 | DB grants + citizen trigger | 🟡 | Trigger ✅ verified on CI (citizen case conversation → errno 1644 `CASE_CONVERSATION_ROLE_FORBIDDEN`; second conversation per case → 1062). `packages/db/sql/grants.sql` (per-table, append-only `audit_log`) is **not yet tested**: needs a test that applies it and checks each DB user's privileges |
 | BE-02a | Scoped repositories + lint ban | ✅ | `packages/db/src/scoped.ts`; ESLint `no-restricted-imports` verified to fail on a deliberate violation |
 | DATA-01 | bdlaws URL/HTML spike | ⛔ | URL patterns + selectors written as config (`apps/worker/src/scrape/source-config.ts`), doc in `apps/worker/src/scrape/README.md`. **Live check blocked:** robots.txt answered once (`Allow: /`), then every page request timed out or was reset. Selectors are unverified assumptions |
 | DATA-02 | legal-text normalizer & hashing | ✅ | 27 tests; 95.3% statement coverage |
@@ -35,15 +35,16 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
 | `pnpm test` (unit) | ✅ 92 / 92 passed (7 files) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
-| `pnpm test:integration` (CI, first run) | 🟡 worker 10/10 ✅. db 6/9: the 3 failures were test assertions matching Drizzle's wrapper message (`Failed query: …`) instead of the MySQL error on `err.cause`. The constraints did reject the inserts. Fixed with `expectDbError` (checks errno 1062/1644 + message); awaiting re-run |
+| `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
+| Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
 | Worker CLI smoke test | ✅ config + wiring load. Fails at the first DB query, as expected with no MySQL |
 
 ## Open items & blockers
 
-1. **Start Docker Desktop**, then run `pnpm test:integration`. This verifies BE-01, BE-02, DATA-05 and the tenant-isolation and versioning constraints against real MySQL 8.4.
+1. **Start Docker Desktop** for local integration runs and OPS-02 (`docker compose up`). CI already runs the integration tests.
 2. **bdlaws unreachable from the dev network** (DATA-01). Try another network or a VPN egress in BD. Without it, the parser selectors stay unverified.
 3. **PRE-01: rotate the AI relay API key** that was pasted into chat. Store new keys only in `.env` (git-ignored) or Secrets Manager.
-4. **`main` CI is red** until `fix/db-int-error-assertions` is merged (3 db.int test assertions; constraints themselves work). Open that PR, confirm CI is green, merge. That also verifies BE-01/BE-02.
+4. **`main` CI `security` job is red** until `fix/semgrep-findings` is merged. Open that PR, confirm green, merge.
 5. RDS later needs `log_bin_trust_function_creators=1` so migrations can create triggers (noted in `grants.sql`).
 
 ## Decisions made during build
@@ -62,12 +63,13 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | 2026-11-03 | Safety valve ratio = (new + changed + removed) / existing current sections; first ingest never quarantined; `--force` overrides | Layout changes usually show up as mass removals, not only edits |
 | 2026-11-03 | Crawler refuses to run when robots.txt is unreachable (4xx = allow all). Run aborts after 5 consecutive network failures | Don't crawl without knowing the rules; don't log 1,480 identical failures |
 | 2026-11-03 | DB-constraint tests assert on the driver error (`err.cause`: errno + message), not on Drizzle's wrapper message | Drizzle 0.45 wraps driver errors in `DrizzleQueryError`; errno is also stricter than message matching |
+| 2026-11-03 | Semgrep warnings get fixed, not suppressed, where cheap. A `nosemgrep` needs a rule id and a reason in the comment | Keeps the full-repo scan on `main` meaningful |
 | 2026-11-03 | `msgpackr-extract` native build disabled (`allowBuilds: false`) | Optional BullMQ speed-up; pure-JS fallback is fine |
 | 2026-11-03 | Bangla sub-section letters map ক→A, খ→B, … in consonant order | Matches inserted-section convention (৩২৬ক = 326A). **LEGAL to confirm beyond ঙ** |
 
 ## Next steps (in order)
 
-1. Start Docker and run `pnpm test:integration` (db + worker); fix anything it surfaces. This closes BE-01, BE-02 and DATA-05.
+1. Merge `fix/semgrep-findings` (makes `main` fully green, closes OPS-03). Add a grants test to close BE-02.
 2. DATA-01: from a network that reaches bdlaws, save the 10 spike Acts as fixtures, then correct selectors and URL patterns (checklist in `apps/worker/src/scrape/README.md`).
 3. Run the Sprint 1 demo for real: `docker compose up -d` → `pnpm db:migrate` → `pnpm --filter @lawassist/worker scrape -- --acts <10 ids>` twice → edit a snapshot → `--act <id> --snapshot <key>`.
 4. Then Sprint 2: DATA-06 chunker + outbox worker → TEI → Qdrant.
