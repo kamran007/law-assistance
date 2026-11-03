@@ -15,6 +15,14 @@ export const envSchema = z.object({
   WEB_ORIGIN: z.string().url().default('http://localhost:3001'),
 
   DATABASE_URL: z.string().url().refine((u) => u.startsWith('mysql://'), 'DATABASE_URL must be a mysql:// URL'),
+  /**
+   * Worker only: the scraper's connection, as the `app_scraper` DB user (TRD §4.3). The outbox
+   * and other worker jobs use DATABASE_URL (`app_worker`). Unset = DATABASE_URL (local dev only).
+   */
+  SCRAPER_DATABASE_URL: z.preprocess(
+    emptyToUndefined,
+    z.string().url().refine((u) => u.startsWith('mysql://'), 'SCRAPER_DATABASE_URL must be a mysql:// URL').optional(),
+  ),
 
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
   QDRANT_URL: z.string().url().default('http://localhost:6333'),

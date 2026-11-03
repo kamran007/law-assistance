@@ -4,6 +4,8 @@ import { migrate } from 'drizzle-orm/mysql2/migrator';
 import { createDb } from './client';
 
 export const MIGRATIONS_FOLDER = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../migrations');
+/** Per-environment DB users and privileges (TRD §4.3); applied by an admin, not by migrations. */
+export const GRANTS_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../sql/grants.sql');
 
 export async function runMigrations(databaseUrl: string): Promise<void> {
   const { db, close } = createDb(databaseUrl, { connectionLimit: 1 });
