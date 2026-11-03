@@ -4,7 +4,7 @@
  * for modules that need them (auth, statutes, scraper, admin).
  */
 export { createDb, type Db } from './client';
-export { runMigrations, MIGRATIONS_FOLDER } from './migrate';
+export { runMigrations, MIGRATIONS_FOLDER, GRANTS_FILE } from './migrate';
 export { scoped, type ScopedRepos, type UpdateResult, type CaseFile, type Conversation, type Message, type CaseArtifact } from './scoped';
 export {
   users,

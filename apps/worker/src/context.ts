@@ -18,11 +18,14 @@ export function createWorkerContext() {
     // Defence in depth: document text, queries and credentials must never reach the logs.
     redact: { paths: ['*.body', '*.html', '*.text', '*.contentBody', '*.chunkText', '*.password', '*.authorization'], censor: '[redacted]' },
   });
+  // Least privilege (TRD §4.3): scraper writes statute data as app_scraper; outbox/indexing runs as
+  // app_worker. Neither DB user can do the other's job, so they need separate connections.
   const { db, close: closeDb } = createDb(cfg.DATABASE_URL, { connectionLimit: 5 });
+  const scraperDb = cfg.SCRAPER_DATABASE_URL ? createDb(cfg.SCRAPER_DATABASE_URL, { connectionLimit: 3 }) : null;
   const redis = new Redis(cfg.REDIS_URL, { maxRetriesPerRequest: null });
   const config = loadSourceConfig();
   const scrape: ScrapeDeps = {
-    db,
+    db: scraperDb?.db ?? db,
     http: new PoliteHttpClient({ config, cache: new RedisConditionalCache(redis) }),
     snapshots: S3SnapshotStore.fromConfig(cfg),
     config,
@@ -43,6 +46,7 @@ export function createWorkerContext() {
     indexer,
     async close() {
       await closeDb();
+      await scraperDb?.close();
       redis.disconnect();
     },
   };

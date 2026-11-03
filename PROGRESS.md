@@ -14,11 +14,11 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | :--- | :--- | :---: | :--- |
 | OPS-01 | Monorepo layout | 🟡 | pnpm workspace with `apps/{api,worker}`, `packages/{config,legal-text,db}`. Still missing: `apps/web`, `packages/{contracts,providers,prompts}`, `mobile/`, `infra/`, `evals/` (created when their tasks start) |
 | OPS-02 | docker-compose | 🟡 | `docker-compose.yml` written (mysql 8.4 + ngram, redis, qdrant, minio, TEI under `--profile ml`). **Not yet run: Docker Desktop was not running** |
-| OPS-03 | CI pipeline | 🟡 | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). Remote `origin` = github.com/kamran007/law-assistance. Run on `main` @ `c8d5f1f`: `check` job all green incl. integration; `security` job red, because Semgrep found 2 warnings that PRs (diff-only scan) didn't show. Fixed on `fix/semgrep-findings` (local Semgrep 1.183, same rulesets: 0 findings). Done when a PR shows green in < 10 min. Trivy is added when Docker images exist |
+| OPS-03 | CI pipeline | ✅ | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). **Done-when met:** PR #4 green in ~1.5 min (all steps incl. integration and security). Trivy is added when Docker images exist |
 | OPS-04 | Terraform base | ⬜ | |
 | OPS-05 | Zod-validated config | ✅ | `packages/config`; 5 tests; errors never echo secret values; secrets required in staging/prod |
 | BE-01 | Drizzle schema (17 tables) | ✅ | `packages/db/src/schema/*`, migrations `0000_init.sql` + `0001_fulltext_and_triggers.sql`. **Verified on CI (`main` @ `c8d5f1f`):** migrations apply cleanly to empty MySQL 8.4; `db.int.test.ts` 9/9 (one-current-version index, ngram FULLTEXT, tenant isolation, optimistic concurrency) |
-| BE-02 | DB grants + citizen trigger | 🟡 | Trigger ✅ verified on CI (citizen case conversation → errno 1644 `CASE_CONVERSATION_ROLE_FORBIDDEN`; second conversation per case → 1062). `packages/db/sql/grants.sql` (per-table, append-only `audit_log`) is **not yet tested**: needs a test that applies it and checks each DB user's privileges |
+| BE-02 | DB grants + citizen trigger | 🟡 | Trigger ✅ (CI). Grants: `apps/worker/test/grants.int.test.ts` applies `grants.sql` to MySQL 8.4 and runs the real code paths as each user: scraper = `syncAct`, worker = `drainOutbox`, api = scoped case + conversation, migrate = DDL. Also checks every denial (user tables, Schedule II, outbox update, append-only `audit_log`, DDL, other schemas). **Found and fixed:** one worker process ran scraper + outbox on a single DB user, but no user has both rights → new `SCRAPER_DATABASE_URL`. Test written on `fix/db-grants`, awaiting its first CI run |
 | BE-02a | Scoped repositories + lint ban | ✅ | `packages/db/src/scoped.ts`; ESLint `no-restricted-imports` verified to fail on a deliberate violation |
 | DATA-01 | bdlaws URL/HTML spike | ⛔ | URL patterns + selectors written as config (`apps/worker/src/scrape/source-config.ts`), doc in `apps/worker/src/scrape/README.md`. **Live check blocked:** robots.txt answered once (`Allow: /`), then every page request timed out or was reset. Selectors are unverified assumptions |
 | DATA-02 | legal-text normalizer & hashing | ✅ | 27 tests; 95.3% statement coverage |
@@ -31,8 +31,8 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 
 | ID | Task | Status | Evidence / Notes |
 | :--- | :--- | :---: | :--- |
-| DATA-06 | Chunker + outbox worker → TEI → Qdrant | 🟡 | Branch `feature/data-embedding`. `apps/worker/src/index/{chunker,indexer,outbox}.ts` + `packages/providers` (TEI client, Qdrant chunk index). Chunks: 350–500 est. tokens, split on sub-section/proviso/explanation, Act/section heading prefixed. Deterministic chunk ids (UUID v8 of section_id + index). All writes re-read MySQL, so replays converge. Unchanged chunks get a payload-only refresh, no re-embed. Failures: attempts + `last_error` (no text), parked after 10. Outbox drained every 15 s (BullMQ, concurrency 1). 18 unit tests (chunker, TEI client, filters). `index.int.test.ts` (MySQL + Qdrant 1.15: index, **replay idempotent**, point-in-time filters incl. `valid_to` boundary, repeal propagation, failure/retry) **written, not run yet: first run on the PR's CI** |
-| DATA-07 | Qdrant collection setup + `reindex --all` | 🟡 | `collection.ts`: alias `section_chunks` → physical `section_chunks_<ts>`, 1024-dim cosine, HNSW m=16/ef_construct=128, payload indexes (is_current, valid_from/to datetime, statute_id, section_id, act_status). `reindexAll` rebuilds all versions from MySQL, catches up on sections changed during the rebuild, swaps the alias, drops the old collection. CLI: `--setup-index`, `--reindex-all`, `--drain-outbox`. Covered by `index.int.test.ts` (not run yet) |
+| DATA-06 | Chunker + outbox worker → TEI → Qdrant | ✅ | Merged (PR #4). `apps/worker/src/index/{chunker,indexer,outbox}.ts` + `packages/providers`. **Verified on CI:** `index.int.test.ts` passed against MySQL 8.4 + Qdrant 1.15: indexing, **outbox replay idempotent** (same ids/rows/points, no re-embed), point-in-time filters incl. `valid_to` boundary, repeal propagation, failure/retry. TEI client unit-tested; real TEI not yet run (CI uses a deterministic fake embedder) |
+| DATA-07 | Qdrant collection setup + `reindex --all` | ✅ | Merged (PR #4). Alias → timestamped collection, HNSW m=16/ef_construct=128, payload indexes, `reindexAll` with catch-up + alias swap. Verified in `index.int.test.ts` on CI |
 | DATA-08 | Ingest top 50 Acts | ⛔ | Needs DATA-01 (portal reachable) and TEI running (`docker compose --profile ml`) |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
 
@@ -80,13 +80,13 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | 2026-11-03 | Point-in-time filter is `valid_from ≤ d < valid_to` (`valid_to` exclusive) | The amendment date belongs to the new version; matches the versioning transaction |
 | 2026-11-03 | Token counts are a heuristic (EN 1.3/word, BN 2.2/word, digits/punct 1), not a real tokenizer | No JS tokenizer for bge-m3. Size only affects granularity; TEI truncates over-long input, so no text is lost |
 | 2026-11-03 | Outbox consumer handles only index events. `NOTIFY_AFFECTED_CASES` stays unprocessed for the future notification consumer | One `processed_at` column per event; separate consumers by event type |
+| 2026-11-03 | Worker uses two DB connections: `DATABASE_URL` (app_worker: outbox, indexing, user-data jobs) and `SCRAPER_DATABASE_URL` (app_scraper: statute writes) | Keeps TRD §4.3 least privilege. Widening either user's grants would let a scraper bug touch user tables, or a worker bug rewrite law text |
 | 2026-11-03 | `msgpackr-extract` native build disabled (`allowBuilds: false`) | Optional BullMQ speed-up; pure-JS fallback is fine |
 | 2026-11-03 | Bangla sub-section letters map ক→A, খ→B, … in consonant order | Matches inserted-section convention (৩২৬ক = 326A). **LEGAL to confirm beyond ঙ** |
 
 ## Next steps (in order)
 
-1. Open the PR for `feature/data-embedding` and check its CI (first run of `index.int.test.ts`); merge when green. Closes DATA-06/07 and OPS-03 (green PR pipeline).
-1a. Add a grants test to close BE-02.
+1. Open the PR for `fix/db-grants`; merge when CI is green. Closes BE-02. Deployed envs must then set `DATABASE_URL` (app_worker) and `SCRAPER_DATABASE_URL` (app_scraper) for the worker.
 2. DATA-01: from a network that reaches bdlaws, save the 10 spike Acts as fixtures, then correct selectors and URL patterns (checklist in `apps/worker/src/scrape/README.md`).
 3. Run the Sprint 1 demo for real: `docker compose up -d` → `pnpm db:migrate` → `pnpm --filter @lawassist/worker scrape -- --acts <10 ids>` twice → edit a snapshot → `--act <id> --snapshot <key>`.
 4. Then Sprint 2: DATA-06 chunker + outbox worker → TEI → Qdrant.

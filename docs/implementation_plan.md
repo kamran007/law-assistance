@@ -79,7 +79,7 @@ These items block engineering milestones. Start them in **Week 1**.
 ### Platform & DevOps
 - [~] **OPS-01** Create the pnpm monorepo layout (`apps/api`, `apps/worker`, `apps/web`, `packages/*`, `mobile/`, `infra/`, `evals/`) per TRD §3.2 · *Done when:* `pnpm install && pnpm build` passes
 - [~] **OPS-02** `docker-compose` for local dev: mysql:8.4, redis, qdrant, minio, TEI (CPU, bge-m3 + reranker) · *Done when:* `docker compose up` brings up every service healthy
-- [~] **OPS-03** GitHub Actions CI: lint, `tsc --noEmit`, Vitest, Testcontainers integration, Gitleaks, Semgrep, Trivy · *Done when:* a PR shows a green pipeline in under 10 min
+- [x] **OPS-03** GitHub Actions CI: lint, `tsc --noEmit`, Vitest, Testcontainers integration, Gitleaks, Semgrep, Trivy · *Done when:* a PR shows a green pipeline in under 10 min
 - [ ] **OPS-04** Terraform base: VPC, private subnets, RDS MySQL 8.4 (dev), ElastiCache, S3 (SSE-KMS), ECR, Secrets Manager, ECS cluster (dev) · *Depends:* OPS-01
 - [x] **OPS-05** `packages/config`: Zod-validated env (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, DB, Redis, Qdrant, Google creds, JWT keys). The app refuses to boot if config is invalid
 
@@ -104,8 +104,8 @@ These items block engineering milestones. Start them in **Week 1**.
 **Goal:** top 50 Acts searchable, with point-in-time support (**M1**); auth and the core API skeleton.
 
 ### Corpus & Search
-- [~] **DATA-06** Chunker (350–500 tokens, split on sub-section/proviso boundaries, heading prefixed) + outbox worker → TEI embed → Qdrant upsert/payload update (TRD §4.4, §6.4) · *Done when:* outbox replay is idempotent (test)
-- [~] **DATA-07** Qdrant collection setup script (HNSW params, payload indexes) + `reindex --all` command with alias swap
+- [x] **DATA-06** Chunker (350–500 tokens, split on sub-section/proviso boundaries, heading prefixed) + outbox worker → TEI embed → Qdrant upsert/payload update (TRD §4.4, §6.4) · *Done when:* outbox replay is idempotent (test)
+- [x] **DATA-07** Qdrant collection setup script (HNSW params, payload indexes) + `reindex --all` command with alias swap
 - [ ] **DATA-08** Ingest the **top 50 Acts** (SRS Phase 1 list: Penal Code, CrPC, CPC, Evidence Act, Limitation Act, Specific Relief Act, Nari-O-Shishu, Cyber Security Act, NI Act, Labour Act, …)
 - [ ] **DATA-09** Schedule II extraction script → draft rows → **LEGAL verifies every row** in a review sheet → import with `verified_by/at` (TRD §6.5) · *Done when:* 100% of rows verified
 - [~] **DATA-10** Nightly BullMQ repeatable job + weekly full re-crawl + scrape_runs dashboard data
