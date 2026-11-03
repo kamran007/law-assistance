@@ -13,6 +13,13 @@ AI legal research platform for Bangladesh law (citizens, lawyers, judges). MVP i
 - Mark a task done only with evidence (tests passing, command output). Record what was verified.
 - Log notable decisions in the PROGRESS.md decisions table.
 
+## Git workflow
+- `main` is always green (lint, typecheck, unit tests pass). Never commit straight to it.
+- One branch per feature/task group: `feature/<area>` (e.g. `feature/data-scraper`, `feature/auth`); `fix/<topic>` for fixes.
+- Conventional commits with the task IDs: `feat(scraper): … (DATA-03)`, `fix(db): …`, `chore: …`.
+- Commit `PROGRESS.md` and `docs/implementation_plan.md` updates together with the code they describe.
+- Merge to `main` only after verification. Note anything unverified (e.g. integration tests) in the commit message.
+
 ## Stack (fixed decisions)
 Node.js 22+ / TypeScript 6 · Fastify 5 + Zod 4 · MySQL 8.4 (Drizzle ORM) · Qdrant · Redis/BullMQ · Next.js 15 · Flutter ·
 AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANTHROPIC_API_KEY` from env only.
@@ -35,6 +42,7 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 ## Layout
 ```
 apps/api          Fastify API
+apps/worker       BullMQ worker: scraper (src/scrape, see README there)
 packages/config   Zod env loader
 packages/db       Drizzle schema, migrations, scoped repos, grants.sql
 packages/legal-text  Bangla/English normalization, section keys, hashing
