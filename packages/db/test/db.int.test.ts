@@ -11,6 +11,28 @@ import { newId, statutes, statuteSections, users } from '../src/schema/index';
  * Covers: migrations, one-current-version constraint, citizen case-conversation trigger,
  * tenant isolation via scoped repos (TRD §4.3), optimistic concurrency, ngram FULLTEXT.
  */
+const ER_DUP_ENTRY = 1062;
+/** Raised by the triggers' SIGNAL SQLSTATE '45000'. */
+const ER_SIGNAL_EXCEPTION = 1644;
+
+/**
+ * Drizzle 0.45 wraps driver errors in DrizzleQueryError ("Failed query: ..."); the MySQL error
+ * (errno + message) is on `.cause`. Assert on the driver error, not the wrapper's message.
+ */
+async function expectDbError(op: Promise<unknown>, errno: number, message: RegExp): Promise<void> {
+  const err: unknown = await op.then(
+    () => undefined,
+    (e: unknown) => e,
+  );
+  expect(err, 'expected the query to be rejected').toBeInstanceOf(Error);
+  const chain: { errno?: unknown; message?: unknown }[] = [];
+  for (let e: unknown = err; e && chain.length < 5; e = (e as { cause?: unknown }).cause) chain.push(e as never);
+  const driver = chain.find((e) => typeof e.errno === 'number');
+  expect(driver, 'no MySQL driver error in the cause chain').toBeDefined();
+  expect(driver!.errno).toBe(errno);
+  expect(String(driver!.message)).toMatch(message);
+}
+
 let container: StartedMySqlContainer;
 let db: Db;
 let close: () => Promise<void>;
@@ -57,9 +79,11 @@ describe('statute versioning constraints', () => {
       validFromSource: 'ENACTMENT_DATE' as const,
     };
     await db.insert(statuteSections).values({ ...base, sectionId: newId(), versionNumber: 1, isCurrent: true, validFrom: '1860-10-06' });
-    await expect(
+    await expectDbError(
       db.insert(statuteSections).values({ ...base, sectionId: newId(), versionNumber: 2, isCurrent: true, validFrom: '2023-01-01' }),
-    ).rejects.toThrow(/Duplicate entry/);
+      ER_DUP_ENTRY,
+      /Duplicate entry .* for key 'statute_sections\.uq_sections_current_key'/,
+    );
     // A superseded (non-current) version is fine.
     await db.insert(statuteSections).values({ ...base, sectionId: newId(), versionNumber: 2, isCurrent: false, validFrom: '1860-10-06', validTo: '2000-01-01' });
   });
@@ -94,17 +118,17 @@ describe('case files & conversations', () => {
 
   it('DB trigger rejects a case conversation for a citizen even if the service layer is bypassed', async () => {
     const citizen = scoped(db, citizenId);
-    await expect(citizen.caseFiles.create({ title: 'x' }, { withConversation: true })).rejects.toThrow(
-      /CASE_CONVERSATION_ROLE_FORBIDDEN/,
-    );
+    await expectDbError(citizen.caseFiles.create({ title: 'x' }, { withConversation: true }), ER_SIGNAL_EXCEPTION, /CASE_CONVERSATION_ROLE_FORBIDDEN/);
   });
 
   it('rejects a second conversation for the same case', async () => {
     const lawyer = scoped(db, lawyerId);
     const c = await lawyer.caseFiles.create({ title: 'dup' }, { withConversation: true });
-    await expect(
+    await expectDbError(
       db.execute(sql`INSERT INTO conversations (conversation_id, owner_user_id, case_file_id) VALUES (UUID_TO_BIN(UUID()), UUID_TO_BIN(${lawyerId}), UUID_TO_BIN(${c.caseFileId}))`),
-    ).rejects.toThrow(/Duplicate entry/);
+      ER_DUP_ENTRY,
+      /Duplicate entry/,
+    );
   });
 });
 
