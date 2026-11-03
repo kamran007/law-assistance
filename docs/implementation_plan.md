@@ -93,7 +93,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **DATA-02** `packages/legal-text`: NFC + Bangla variant normalizer, Bangla↔ASCII digits, section-key normalizer (`৫৬১ক` → `561A`), SHA-256 hashing · *Done when:* ≥ 95% unit-test coverage
 - [~] **DATA-03** Crawler worker: undici + 1 req/s limiter, robots.txt, conditional GET, backoff, raw HTML snapshots to S3 (TRD §6.1)
 - [~] **DATA-04** Cheerio parser: Act → Chapter → Section → Sub-section → Footnotes; footnote action parser (substituted/inserted/omitted, amending Act, date) (TRD §6.2)
-- [~] **DATA-05** Versioning transaction + outbox writes + 20% change safety valve (TRD §6.3) · *Done when:* the integration test "amend → archive → new current" passes, including concurrent workers
+- [x] **DATA-05** Versioning transaction + outbox writes + 20% change safety valve (TRD §6.3) · *Done when:* the integration test "amend → archive → new current" passes, including concurrent workers
 
 **Sprint 1 demo:** scrape 10 Acts → re-run → no new versions → edit one snapshot by hand → re-run → v2 created, v1 archived with `valid_to`.
 
