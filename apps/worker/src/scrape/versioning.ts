@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { newId, outboxEvents, statutes, statuteSections, type Db } from '@lawassist/db';
 import type { ParsedFootnote } from '@lawassist/legal-text';
@@ -324,7 +325,7 @@ export async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<
       const errno = mysqlErrno(err);
       const retryable = errno === ER_DUP_ENTRY || errno === ER_LOCK_DEADLOCK || errno === ER_LOCK_WAIT_TIMEOUT;
       if (!retryable || i >= attempts) throw err;
-      await new Promise((r) => setTimeout(r, 25 * i + Math.random() * 50));
+      await new Promise((r) => setTimeout(r, 25 * i + randomInt(50)));
     }
   }
 }

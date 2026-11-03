@@ -84,7 +84,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **OPS-05** `packages/config`: Zod-validated env (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, DB, Redis, Qdrant, Google creds, JWT keys). The app refuses to boot if config is invalid
 
 ### Database
-- [~] **BE-01** Drizzle schema for all tables in TRD §4.2: users, statutes, statute_sections (+ `current_key` generated column, FULLTEXT ngram), section_chunks, crpc_schedule_metadata, case_files, case_artifacts, artifact_revisions, conversations, messages, otp_challenges, refresh_tokens, credential_reviews, scrape_runs/events, outbox_events, audit_log · *Done when:* migrations apply cleanly on an empty DB
+- [x] **BE-01** Drizzle schema for all tables in TRD §4.2: users, statutes, statute_sections (+ `current_key` generated column, FULLTEXT ngram), section_chunks, crpc_schedule_metadata, case_files, case_artifacts, artifact_revisions, conversations, messages, otp_challenges, refresh_tokens, credential_reviews, scrape_runs/events, outbox_events, audit_log · *Done when:* migrations apply cleanly on an empty DB
 - [~] **BE-02** DB users & grants (`app_api`, `app_worker`, `app_scraper`, `app_migrate`) per TRD §4.3 · Citizen-case-conversation trigger (TRD §4.2)
 - [x] **BE-02a** `packages/db/scoped.ts` scoped repository + ESLint `no-restricted-imports` ban on raw access to tenant tables · *Done when:* lint fails on a deliberate violation
 
