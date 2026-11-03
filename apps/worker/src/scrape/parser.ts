@@ -209,11 +209,25 @@ function splitParts(lines: string[]): SectionPart[] {
   return lines.map((line, idx) => {
     // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- SECTION_NUMBER is linear-time (see its definition)
     const text = idx === 0 ? line.replace(SECTION_NUMBER, '').trim() : line;
-    const sub = SUBSECTION.exec(text);
-    if (sub) return { kind: 'SUBSECTION', label: `(${sub[1]})`, text };
-    if (PROVISO.test(text)) return { kind: 'PROVISO', label: null, text };
-    if (EXPLANATION.test(text)) return { kind: 'EXPLANATION', label: null, text };
-    if (ILLUSTRATION.test(text)) return { kind: 'ILLUSTRATION', label: null, text };
-    return { kind: 'TEXT', label: null, text };
+    return classifyLine(text);
   });
+}
+
+/**
+ * Classifies one paragraph of section text. Also used by the chunker (DATA-06) to split on
+ * sub-section / proviso / explanation boundaries. Expects a line without the leading section number.
+ */
+export function classifyLine(text: string): SectionPart {
+  const sub = SUBSECTION.exec(text);
+  if (sub) return { kind: 'SUBSECTION', label: `(${sub[1]})`, text };
+  if (PROVISO.test(text)) return { kind: 'PROVISO', label: null, text };
+  if (EXPLANATION.test(text)) return { kind: 'EXPLANATION', label: null, text };
+  if (ILLUSTRATION.test(text)) return { kind: 'ILLUSTRATION', label: null, text };
+  return { kind: 'TEXT', label: null, text };
+}
+
+/** Removes the leading "420." / "৪২০।" section number from the first line of a section body. */
+export function stripSectionNumber(line: string): string {
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- SECTION_NUMBER is linear-time (see its definition)
+  return line.replace(SECTION_NUMBER, '').trim();
 }

@@ -14,6 +14,7 @@
     "@lawassist/config": "workspace:*",
     "@lawassist/db": "workspace:*",
     "@lawassist/legal-text": "workspace:*",
+    "@lawassist/providers": "workspace:*",
     "bullmq": "^6.5.3",
     "cheerio": "^1.2.0",
     "domhandler": "^5.0.3",

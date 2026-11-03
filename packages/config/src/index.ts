@@ -20,6 +20,10 @@ export const envSchema = z.object({
   QDRANT_URL: z.string().url().default('http://localhost:6333'),
   QDRANT_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   TEI_EMBED_URL: z.string().url().default('http://localhost:8081'),
+  /** Stored in section_chunks.embedding_model; changing it (e.g. a new revision) means a reindex. */
+  EMBEDDING_MODEL: z.string().min(1).default('BAAI/bge-m3'),
+  /** Qdrant ALIAS used for search; physical collections are <alias>_<timestamp> (TRD §4.4). */
+  QDRANT_COLLECTION: z.string().regex(/^[a-z0-9_]+$/).default('section_chunks'),
   TEI_RERANK_URL: z.string().url().default('http://localhost:8082'),
 
   S3_ENDPOINT: z.preprocess(emptyToUndefined, z.string().url().optional()),

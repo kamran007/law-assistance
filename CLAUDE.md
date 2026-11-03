@@ -42,8 +42,9 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 ## Layout
 ```
 apps/api          Fastify API
-apps/worker       BullMQ worker: scraper (src/scrape, see README there)
+apps/worker       BullMQ worker: scraper (src/scrape, see README there), vector indexing (src/index)
 packages/config   Zod env loader
+packages/providers  TEI embedding client, Qdrant chunk index (vendor interfaces)
 packages/db       Drizzle schema, migrations, scoped repos, grants.sql
 packages/legal-text  Bangla/English normalization, section keys, hashing
 docs/             Specs and implementation plan

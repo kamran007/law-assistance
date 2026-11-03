@@ -104,11 +104,11 @@ These items block engineering milestones. Start them in **Week 1**.
 **Goal:** top 50 Acts searchable, with point-in-time support (**M1**); auth and the core API skeleton.
 
 ### Corpus & Search
-- [ ] **DATA-06** Chunker (350–500 tokens, split on sub-section/proviso boundaries, heading prefixed) + outbox worker → TEI embed → Qdrant upsert/payload update (TRD §4.4, §6.4) · *Done when:* outbox replay is idempotent (test)
-- [ ] **DATA-07** Qdrant collection setup script (HNSW params, payload indexes) + `reindex --all` command with alias swap
+- [~] **DATA-06** Chunker (350–500 tokens, split on sub-section/proviso boundaries, heading prefixed) + outbox worker → TEI embed → Qdrant upsert/payload update (TRD §4.4, §6.4) · *Done when:* outbox replay is idempotent (test)
+- [~] **DATA-07** Qdrant collection setup script (HNSW params, payload indexes) + `reindex --all` command with alias swap
 - [ ] **DATA-08** Ingest the **top 50 Acts** (SRS Phase 1 list: Penal Code, CrPC, CPC, Evidence Act, Limitation Act, Specific Relief Act, Nari-O-Shishu, Cyber Security Act, NI Act, Labour Act, …)
 - [ ] **DATA-09** Schedule II extraction script → draft rows → **LEGAL verifies every row** in a review sheet → import with `verified_by/at` (TRD §6.5) · *Done when:* 100% of rows verified
-- [ ] **DATA-10** Nightly BullMQ repeatable job + weekly full re-crawl + scrape_runs dashboard data
+- [~] **DATA-10** Nightly BullMQ repeatable job + weekly full re-crawl + scrape_runs dashboard data
 
 ### API Core
 - [ ] **BE-03** Auth: OTP request/verify (SMS + email), ES256 JWT, refresh rotation with reuse detection, `/auth/login` alias (TRD §12.1) · *Depends:* PRE-05 (a mock SMS provider is used until it lands)
