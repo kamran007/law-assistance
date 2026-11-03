@@ -14,7 +14,7 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | :--- | :--- | :---: | :--- |
 | OPS-01 | Monorepo layout | 🟡 | pnpm workspace with `apps/{api,worker}`, `packages/{config,legal-text,db}`. Still missing: `apps/web`, `packages/{contracts,providers,prompts}`, `mobile/`, `infra/`, `evals/` (created when their tasks start) |
 | OPS-02 | docker-compose | 🟡 | `docker-compose.yml` written (mysql 8.4 + ngram, redis, qdrant, minio, TEI under `--profile ml`). **Not yet run: Docker Desktop was not running** |
-| OPS-03 | CI pipeline | 🟡 | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). Not run on GitHub yet (no remote). Trivy is added when Docker images exist |
+| OPS-03 | CI pipeline | 🟡 | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). Remote `origin` = github.com/kamran007/law-assistance (2026-11-03). First CI run comes with the `feature/data-scraper` PR; result pending. Trivy is added when Docker images exist |
 | OPS-04 | Terraform base | ⬜ | |
 | OPS-05 | Zod-validated config | ✅ | `packages/config`; 5 tests; errors never echo secret values; secrets required in staging/prod |
 | BE-01 | Drizzle schema (17 tables) | 🟡 | `packages/db/src/schema/*`, migrations `0000_init.sql` + `0001_fulltext_and_triggers.sql`. Type-checks. **Applying to real MySQL is pending (needs Docker)** |
@@ -43,7 +43,7 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 1. **Start Docker Desktop**, then run `pnpm test:integration`. This verifies BE-01, BE-02, DATA-05 and the tenant-isolation and versioning constraints against real MySQL 8.4.
 2. **bdlaws unreachable from the dev network** (DATA-01). Try another network or a VPN egress in BD. Without it, the parser selectors stay unverified.
 3. **PRE-01: rotate the AI relay API key** that was pasted into chat. Store new keys only in `.env` (git-ignored) or Secrets Manager.
-4. Create a GitHub remote so CI (OPS-03) can run.
+4. Open the PR for `feature/data-scraper` and check the first CI run (OPS-03). Integration tests on CI also cover DATA-05, since GitHub runners have Docker.
 5. RDS later needs `log_bin_trust_function_creators=1` so migrations can create triggers (noted in `grants.sql`).
 
 ## Decisions made during build
