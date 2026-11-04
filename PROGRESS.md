@@ -34,6 +34,8 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | DATA-06 | Chunker + outbox worker → TEI → Qdrant | ✅ | Merged (PR #4). `apps/worker/src/index/{chunker,indexer,outbox}.ts` + `packages/providers`. **Verified on CI:** `index.int.test.ts` passed against MySQL 8.4 + Qdrant 1.15: indexing, **outbox replay idempotent** (same ids/rows/points, no re-embed), point-in-time filters incl. `valid_to` boundary, repeal propagation, failure/retry. TEI client unit-tested; real TEI not yet run (CI uses a deterministic fake embedder) |
 | DATA-07 | Qdrant collection setup + `reindex --all` | ✅ | Merged (PR #4). Alias → timestamped collection, HNSW m=16/ef_construct=128, payload indexes, `reindexAll` with catch-up + alias swap. Verified in `index.int.test.ts` on CI |
 | DATA-08 | Ingest top 50 Acts | ⬜ | Unblocked: portal reachable, scraper verified. Needs TEI (`docker compose --profile ml`) for embeddings, and the 50 Act ids looked up on the chronological index |
+| BE-05 | Fastify app skeleton | 🟡 | Done: Zod type provider, **OpenAPI 3 at `/docs/json` + Swagger UI at `/docs`** (generated from the route schemas), RFC 9457 errors (`ApiError`), helmet, CORS, **rate limiting** (`@fastify/rate-limit`, Redis store, 300/min/client safety net, `skipOnError`, 429 as a problem body), pino redaction, `trustProxy` in staging/prod. 7 tests. **Not done: OpenTelemetry** (planned with OPS-08 dashboards) |
+| BE-06 | Statutes read API | ✅ | `apps/api/src/modules/statutes`: `GET /api/v1/statutes` (ngram FULLTEXT search on EN/BN titles, status/year filters, paging), `/statutes/{act_id}` (chapter tree, natural section order), `/sections/{sec}` (verbatim text, footnotes, verified Schedule II strip; Bangla section numbers accepted), `?as_of=` and `/versions` for verified LAWYER/JUDGE (401/403 otherwise; auth is a stub until BE-03/04). Redis cache keyed by an Act generation the scraper bumps after each sync. **Verified:** `statutes.int.test.ts` 16/16 on MySQL 8.4 (point-in-time incl. `valid_to` boundary, not-yet-in-force 404, unverified Schedule II never served, cache); live smoke on the 9 real Acts; live cache invalidation (scrape of Act 16 → generation 0 → 1) |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
 
 ## Case law (Module D) — planned for S3–S4
@@ -58,13 +60,13 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit) | ✅ 130 / 130 passed (9 files) |
+| `pnpm test` (unit) | ✅ 140 / 140 passed (10 files) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
-| `pnpm test:integration` (local Docker) | ✅ 4 files / 38 tests (db, versioning, index, grants) |
+| `pnpm test:integration` (local Docker) | ✅ 5 files / 54 tests (db, versioning, index, grants, statutes API) |
 | Sprint 1 demo (live portal, local stack) | ✅ 9 Acts → 1,804 sections; re-run 0 changes; edited snapshot → Penal Code s.420 v2 current (`DETECTED_ON_SYNC`), v1 `valid_to` 2026-11-04; outbox CLOSED + NOTIFY_AFFECTED_CASES |
-| Semgrep 1.183 (Docker image, `apps/worker/src/scrape`) | ✅ 0 findings |
+| Semgrep 1.183 (Docker image; `apps/api/src`, `apps/worker/src`, `packages/providers/src`) | ✅ 0 findings |
 | Scraper coverage (parser / http-client / discover) | 94% / 99% / 100% lines |
 
 ## Open items & blockers
@@ -109,12 +111,18 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-04 | A section row without a number continues the section above; its marginal note goes into the hash. Display heading = first row’s note | The portal splits sections over rows. Single-row sections hash exactly as before |
 | 2026-11-04 | Range rows (`23 and 24.`, `100-103.`) become one section per number, with the shared text | A lookup of CrPC s.24 must find its "[Repealed]" text |
 | 2026-11-04 | Discovery uses only the chronological index | The main index lists volumes only; the alphabetical index is about 57 MB |
+| 2026-11-04 | Statute read cache keyed by a per-Act generation the scraper bumps after each committed sync; TTL 1 h (TRD §11.3 updated) | Outbox-based invalidation would wait for TEI/Qdrant, so a TEI outage would keep stale law text cached. A lost bump is bounded by the TTL |
+| 2026-11-04 | `{act_id}` in statute URLs is the bdlaws Act id | Stable, public, and what the SRS calls `act_id` |
+| 2026-11-04 | Auth is an injected `Authenticate` function; `anonymous` until BE-03/04 | Routes and tests are written against the final shape; JWT verification plugs in without route changes |
+| 2026-11-04 | API Zod schemas live in `apps/api/src/modules/*/schemas.ts` for now | Move to `packages/contracts` when the web client (WEB-01) consumes them; no second consumer yet |
+| 2026-11-04 | Default rate limit 300/min per client on every route, Redis-backed, skipped if Redis is down | Safety net only; TRD §5.5 per-route limits come with those routes. Serving law text matters more than the limit |
 | 2026-11-04 | Judgments add to an answer but never replace the statute citation or bypass the NO_PROVISION gate | Keeps SRS NFR 1 (every statutory claim cited to `statute_sections`) intact |
 
 ## Next steps (in order)
 
 1. Merge `feature/data-01-spike` (DATA-01/03/04, SeaweedFS) once its PR is green.
 2. Decide the nightly-crawl scope (open item 1), then finish DATA-10.
-3. DATA-08: pick the top-50 Act ids from the chronological index, start `docker compose --profile ml` (TEI), ingest and embed. Closes OPS-02 too.
-4. Sprint 2 API core, unblocked: BE-05 (Fastify skeleton) → BE-06 (statutes read API) → BE-07 (retrieval).
-5. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.
+3. DATA-08: confirm the top-50 Act list, free disk for TEI (C: has 7.5 GB free; TEI needs ~6 GB), then `docker compose --profile ml up -d`, ingest and embed. Closes OPS-02 too.
+4. Merge `feature/api-core` (BE-05/06) after `feature/data-01-spike`.
+5. BE-07 retrieval (needs TEI for the dense arm and the reranker) and BE-03/04 auth (OTP with a mock SMS provider, ES256 JWT) — auth is fully unblocked.
+6. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.

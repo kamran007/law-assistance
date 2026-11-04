@@ -768,7 +768,7 @@ The relay adds a network hop, so measure its overhead in Phase 2. If the model s
 - **MySQL:** `db.r6g.large` is ample for the pilot. The ngram FULLTEXT index on ~60k sections is modest.
 
 ### 11.3 Caching
-- **Redis cache:** statute section reads (`act:sec:as_of` key, 24 h TTL, invalidated by the outbox worker) and Schedule II rows.
+- **Redis cache:** statute section reads, Schedule II strip included (`statutes:v1:section:{act}:{generation}:{sec}:{as_of}`, 1 h TTL). The scraper bumps the Act's generation (`statutes:v1:gen:{act}`) right after each committed sync, so a changed Act is never served from cache; the TTL only bounds staleness if a bump is lost. Not tied to the outbox, because index events complete only after TEI/Qdrant succeed and a TEI outage would otherwise keep stale law text cached. A Redis failure falls back to MySQL.
 - **CDN:** caches the public law-library pages (Next.js ISR, revalidated on sync).
 - **MySQL pool:** `mysql2` pool of 20 connections per API task. Use RDS Proxy if the task count grows.
 

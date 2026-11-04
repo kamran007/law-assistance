@@ -2,7 +2,7 @@ import { Redis } from 'ioredis';
 import { pino } from 'pino';
 import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
-import { QdrantChunkIndex, TeiEmbeddingProvider, createQdrantClient } from '@lawassist/providers';
+import { QdrantChunkIndex, TeiEmbeddingProvider, createQdrantClient, statuteGenerationKey } from '@lawassist/providers';
 import { SectionIndexer } from './index/indexer';
 import { PoliteHttpClient } from './scrape/http-client';
 import { RedisConditionalCache } from './scrape/redis-conditional-cache';
@@ -30,6 +30,10 @@ export function createWorkerContext() {
     snapshots: S3SnapshotStore.fromConfig(cfg),
     config,
     log,
+    // The API caches section reads under the Act's generation (TRD §11.3); a new one hides them.
+    onActSynced: async (bdlawsActId) => {
+      await redis.incr(statuteGenerationKey(bdlawsActId));
+    },
   };
 
   const qdrant = createQdrantClient({ url: cfg.QDRANT_URL, apiKey: cfg.QDRANT_API_KEY });

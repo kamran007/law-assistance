@@ -188,7 +188,9 @@ describe('Sprint 1 demo flow via runScrape', () => {
       config: cfg,
       log,
       today: () => '2026-11-10',
+      onActSynced: async (id) => void synced.push(id),
     };
+    const synced: number[] = [];
 
     const first = await runScrape(deps, { kind: 'MANUAL', actIds: [500] });
     expect(first).toMatchObject({ status: 'SUCCEEDED', actsChecked: 1, sectionsChanged: 5 });
@@ -201,6 +203,8 @@ describe('Sprint 1 demo flow via runScrape', () => {
     const editedKey = await snapshots.put(500, new Date('2026-11-10T12:00:00Z'), edited);
     const out = await syncFromSnapshot(deps, 500, editedKey);
     expect(out).toMatchObject({ kind: 'synced', result: { status: 'SYNCED', versioned: 1 } });
+    // Each committed sync bumps the API cache generation (TRD §11.3).
+    expect(synced).toEqual([500, 500, 500]);
 
     const [statute] = await db.select().from(statutes).where(eq(statutes.bdlawsActId, 500));
     const [v1, v2] = await versionsOf(statute!.statuteId, '341');

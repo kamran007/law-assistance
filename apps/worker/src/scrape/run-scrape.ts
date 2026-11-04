@@ -22,6 +22,12 @@ export interface ScrapeDeps {
   log: Log;
   /** ISO date in Asia/Dhaka; injectable for tests. */
   today?: () => string;
+  /**
+   * Called after a sync of an Act has committed (whether or not anything changed). The worker uses
+   * it to bump the Act's cache generation so the API stops serving cached reads (TRD §11.3).
+   * A failure here is logged and does not fail the sync; cached entries also expire on their own.
+   */
+  onActSynced?: (bdlawsActId: number) => Promise<void>;
 }
 
 export type ScrapeKind = 'NIGHTLY' | 'FULL' | 'MANUAL';
@@ -167,6 +173,11 @@ async function syncFromHtml(deps: ScrapeDeps, actId: number, html: string, snaps
     throw new Error(`no sections parsed (${parsed.warnings.length} warnings); snapshot ${snapshotKey}`);
   }
   const result = await syncAct(deps.db, parsed, { today: (deps.today ?? dhakaToday)(), snapshotKey, force });
+  if (result.status === 'SYNCED' && deps.onActSynced) {
+    await deps.onActSynced(actId).catch((err: unknown) =>
+      deps.log.warn({ bdlawsActId: actId, err: err instanceof Error ? err.message : String(err) }, 'cache generation bump failed'),
+    );
+  }
   return { kind: 'synced', result, warnings: parsed.warnings };
 }
 

@@ -48,4 +48,30 @@ describe('api skeleton', () => {
     expect(res.statusCode).toBe(500);
     expect(res.body).not.toContain('hunter2');
   });
+
+  it('serves the OpenAPI document generated from the Zod schemas, and Swagger UI at /docs', async () => {
+    const spec = await app.inject({ method: 'GET', url: '/docs/json' });
+    expect(spec.statusCode).toBe(200);
+    expect(spec.json()).toMatchObject({ openapi: expect.stringMatching(/^3\./), info: { title: 'BD-LawAssist API' } });
+    expect(Object.keys(spec.json().paths)).toContain('/echo');
+    expect(Object.keys(spec.json().paths)).not.toContain('/health');
+    const ui = await app.inject({ method: 'GET', url: '/docs/' });
+    expect(ui.statusCode).toBe(200);
+  });
+});
+
+describe('rate limiting', () => {
+  it('answers 429 with a problem body once the per-client limit is used up; probes are exempt', async () => {
+    const limited = await buildApp(config);
+    limited.get('/limited', { config: { rateLimit: { max: 2, timeWindow: '1 minute' } } }, async () => ({ ok: true }));
+    await limited.ready();
+    const codes = [];
+    for (let i = 0; i < 3; i++) codes.push((await limited.inject({ method: 'GET', url: '/limited' })).statusCode);
+    expect(codes).toEqual([200, 200, 429]);
+    const res = await limited.inject({ method: 'GET', url: '/limited' });
+    expect(res.headers['content-type']).toContain('application/problem+json');
+    expect(res.json()).toMatchObject({ status: 429, code: 'RATE_LIMITED' });
+    for (let i = 0; i < 5; i++) expect((await limited.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
+    await limited.close();
+  });
 });

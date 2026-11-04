@@ -17,3 +17,4 @@ export {
   type TemporalFilter,
 } from './chunk-index';
 export type { QdrantClient } from '@qdrant/js-client-rest';
+export { STATUTE_CACHE_PREFIX, statuteGenerationKey } from './cache-keys';
