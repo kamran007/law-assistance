@@ -1,18 +1,30 @@
+import { randomBytes } from 'node:crypto';
 import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
 import { sql } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { buildApp } from './app';
-import { anonymous } from './auth';
+import { jwtAuthenticate } from './modules/auth/authenticate';
+import { ConsoleOtpSender } from './modules/auth/otp';
+import { AuthService } from './modules/auth/service';
+import { TokenService } from './modules/auth/tokens';
 import { RedisSectionCache, resilient } from './modules/statutes/cache';
 import { StatutesRepository } from './modules/statutes/repository';
 import { dhakaToday } from './time';
 
 const config = loadConfig();
+const dev = config.NODE_ENV === 'development';
 const { db, close } = createDb(config.DATABASE_URL);
 // One connection for the cache and rate limiting. Commands fail fast instead of queueing while
 // Redis is down; both callers then fall back (cache → MySQL, rate limit → skipped).
 const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false });
+
+// Staging/production can't boot without keys (packages/config). In local development a missing
+// key gets a throwaway value: tokens and codes then stop working when the process restarts.
+const tokens =
+  config.JWT_PRIVATE_KEY && config.JWT_PUBLIC_KEY ? await TokenService.fromPem(config.JWT_PRIVATE_KEY, config.JWT_PUBLIC_KEY) : await TokenService.ephemeral();
+const otpKey = config.OTP_HMAC_KEY ?? randomBytes(32).toString('hex');
+const authenticate = jwtAuthenticate(tokens);
 
 const app = await buildApp(config, {
   checkReady: async () => {
@@ -23,11 +35,19 @@ const app = await buildApp(config, {
   statutes: {
     repo: new StatutesRepository(db),
     cache: resilient(new RedisSectionCache(redis), (err) => app.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'section cache unavailable')),
-    // JWT auth arrives with BE-03/BE-04; until then every request is anonymous.
-    authenticate: anonymous,
+    authenticate,
     today: dhakaToday,
   },
+  auth: {
+    // OTP_DELIVERY=console is the only sender until PRE-05; config refuses it outside development.
+    service: new AuthService({ db, tokens, sender: new ConsoleOtpSender(), otpKey }),
+    authenticate,
+    secureCookies: !dev,
+  },
 });
+if (dev && (!config.JWT_PRIVATE_KEY || !config.OTP_HMAC_KEY)) {
+  app.log.warn('JWT/OTP keys not set: using throwaway keys; sessions end when the API restarts');
+}
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');

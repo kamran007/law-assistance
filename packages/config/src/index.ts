@@ -46,8 +46,17 @@ export const envSchema = z.object({
   LLM_MODEL_ASSISTANT: z.string().default('claude-opus-5-5'),
   LLM_MODEL_EXTRACTION: z.string().default('claude-opus-5-5'),
 
+  /** ES256 PEM keys (`\n`-escaped in env files). Development generates a throwaway pair if unset. */
   JWT_PRIVATE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   JWT_PUBLIC_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  /** HMAC key for one-time codes (TRD §12.1); codes are stored only as HMACs. ≥ 32 characters. */
+  OTP_HMAC_KEY: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
+  /**
+   * How one-time codes are delivered. `console` prints them to the API's stdout and is for local
+   * development only; it is refused in staging/production. A real SMS/email sender comes with
+   * PRE-05 (SMS gateway contract, SES sender domain).
+   */
+  OTP_DELIVERY: z.enum(['console']).default('console'),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -60,7 +69,7 @@ export class ConfigError extends Error {
 }
 
 /** Secrets that must be present outside local development and tests. */
-const REQUIRED_IN_DEPLOYED_ENVS = ['ANTHROPIC_API_KEY', 'JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY'] as const;
+const REQUIRED_IN_DEPLOYED_ENVS = ['ANTHROPIC_API_KEY', 'JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'OTP_HMAC_KEY'] as const;
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): AppConfig {
   const parsed = envSchema.safeParse(source);
@@ -72,6 +81,9 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   if (cfg.NODE_ENV === 'staging' || cfg.NODE_ENV === 'production') {
     const missing = REQUIRED_IN_DEPLOYED_ENVS.filter((k) => !cfg[k]);
     if (missing.length) throw new ConfigError(missing.map((k) => `${k}: required in ${cfg.NODE_ENV}`));
+    if (cfg.OTP_DELIVERY === 'console') {
+      throw new ConfigError([`OTP_DELIVERY: 'console' prints login codes and is not allowed in ${cfg.NODE_ENV}`]);
+    }
   }
   return cfg;
 }

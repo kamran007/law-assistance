@@ -114,8 +114,8 @@ These items block engineering milestones. Start them in **Week 1**.
 - [~] **DATA-10** Nightly BullMQ repeatable job + weekly full re-crawl + scrape_runs dashboard data
 
 ### API Core
-- [ ] **BE-03** Auth: OTP request/verify (SMS + email), ES256 JWT, refresh rotation with reuse detection, `/auth/login` alias (TRD §12.1) · *Depends:* PRE-05 (a mock SMS provider is used until it lands)
-- [ ] **BE-04** `/me`, `/me/credential`, verification status, `requireRoles` + `requireVerified` hooks
+- [x] **BE-03** Auth: OTP request/verify (SMS + email), ES256 JWT, refresh rotation with reuse detection, `/auth/login` alias (TRD §12.1) · *Depends:* PRE-05 (a mock SMS provider is used until it lands)
+- [x] **BE-04** `/me`, `/me/credential`, verification status, `requireRoles` + `requireVerified` hooks
 - [~] **BE-05** Fastify app skeleton: Zod type provider, OpenAPI at `/docs`, RFC 9457 errors, helmet, CORS, rate limiting (Redis), pino redaction, OpenTelemetry
 - [x] **BE-06** Statutes read API: `/statutes`, `/statutes/{act}`, `/sections/{sec}?as_of=`, `/versions` + Redis cache (generation-keyed, TRD §11.3)
 - [ ] **BE-07** Retrieval service: query normalizer, explicit-citation detector, Qdrant dense + MySQL FULLTEXT sparse in parallel, RRF fusion, TEI rerank, sufficiency gate, point-in-time filters (TRD §7.1)

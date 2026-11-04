@@ -35,6 +35,8 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | DATA-07 | Qdrant collection setup + `reindex --all` | ✅ | Merged (PR #4). Alias → timestamped collection, HNSW m=16/ef_construct=128, payload indexes, `reindexAll` with catch-up + alias swap. Verified in `index.int.test.ts` on CI |
 | DATA-08 | Ingest top 50 Acts | ⬜ | Unblocked: portal reachable, scraper verified. Needs TEI (`docker compose --profile ml`) for embeddings, and the 50 Act ids looked up on the chronological index |
 | BE-05 | Fastify app skeleton | 🟡 | Done: Zod type provider, **OpenAPI 3 at `/docs/json` + Swagger UI at `/docs`** (generated from the route schemas), RFC 9457 errors (`ApiError`), helmet, CORS, **rate limiting** (`@fastify/rate-limit`, Redis store, 300/min/client safety net, `skipOnError`, 429 as a problem body), pino redaction, `trustProxy` in staging/prod. 7 tests. **Not done: OpenTelemetry** (planned with OPS-08 dashboards) |
+| BE-03 | Auth: OTP, ES256 JWT, refresh rotation | ✅ | `apps/api/src/modules/auth`: `POST /auth/otp/request` (BD mobile or email, normalized; 3 per 10 min per contact + 60 s resend in the service, 10/h per IP), `/auth/otp/verify` + `/auth/login` alias (6 digits, Bangla digits accepted, 5 min TTL, 5 attempts, HMAC-stored, single use), first login creates a CITIZEN; ES256 access JWT 15 min (`sub`, `role`, `vs`, `sid`, `jti`); opaque refresh 30 days, SHA-256 stored, rotated on use, **reuse revokes the family**; web gets it as an HttpOnly SameSite=Strict cookie on `/api/v1/auth/refresh`; `/auth/logout`. SMS: dev console sender until PRE-05 (config refuses it in staging/prod). **Verified:** `auth.int.test.ts` 14/14 on MySQL 8.4 (limits, lockout, expiry, concurrent verify → exactly one wins, reuse detection, cookie flow, logout); live sign-in against the local stack; logs carry no codes or full contacts |
+| BE-04 | `/me`, credentials, role checks | ✅ | `GET/PATCH /me` (name, language; role not writable), `POST /me/credential` (LAWYER/JUDGE → `PENDING`, role stays CITIZEN; once, again after REJECTED; audit row without the credential number). `requireAuth` / `requireProfessional` (pending applicant → `VERIFICATION_REQUIRED`). Approval takes effect at the next refresh. Admin approval UI is BE-40 |
 | BE-06 | Statutes read API | ✅ | `apps/api/src/modules/statutes`: `GET /api/v1/statutes` (ngram FULLTEXT search on EN/BN titles, status/year filters, paging), `/statutes/{act_id}` (chapter tree, natural section order), `/sections/{sec}` (verbatim text, footnotes, verified Schedule II strip; Bangla section numbers accepted), `?as_of=` and `/versions` for verified LAWYER/JUDGE (401/403 otherwise; auth is a stub until BE-03/04). Redis cache keyed by an Act generation the scraper bumps after each sync. **Verified:** `statutes.int.test.ts` 16/16 on MySQL 8.4 (point-in-time incl. `valid_to` boundary, not-yet-in-force 404, unverified Schedule II never served, cache); live smoke on the 9 real Acts; live cache invalidation (scrape of Act 16 → generation 0 → 1) |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
 
@@ -60,13 +62,13 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit) | ✅ 140 / 140 passed (10 files) |
+| `pnpm test` (unit) | ✅ 162 / 162 passed (11 files) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
-| `pnpm test:integration` (local Docker) | ✅ 5 files / 54 tests (db, versioning, index, grants, statutes API) |
+| `pnpm test:integration` (local Docker) | ✅ 6 files / 68 tests (db, versioning, index, grants, statutes API, auth) |
 | Sprint 1 demo (live portal, local stack) | ✅ 9 Acts → 1,804 sections; re-run 0 changes; edited snapshot → Penal Code s.420 v2 current (`DETECTED_ON_SYNC`), v1 `valid_to` 2026-11-04; outbox CLOSED + NOTIFY_AFFECTED_CASES |
-| Semgrep 1.183 (Docker image; `apps/api/src`, `apps/worker/src`, `packages/providers/src`) | ✅ 0 findings |
+| Semgrep 1.183 (Docker image; `apps/api/src`, `apps/worker/src`, `packages/providers/src`, `packages/config/src`; + `p/jwt` for auth) | ✅ 0 findings |
 | Scraper coverage (parser / http-client / discover) | 94% / 99% / 100% lines |
 
 ## Open items & blockers
@@ -111,6 +113,11 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-04 | A section row without a number continues the section above; its marginal note goes into the hash. Display heading = first row’s note | The portal splits sections over rows. Single-row sections hash exactly as before |
 | 2026-11-04 | Range rows (`23 and 24.`, `100-103.`) become one section per number, with the shared text | A lookup of CrPC s.24 must find its "[Repealed]" text |
 | 2026-11-04 | Discovery uses only the chronological index | The main index lists volumes only; the alphabetical index is about 57 MB |
+| 2026-11-04 | The first verified code creates the account (CITIZEN, empty name); Profile Setup follows via `PATCH /me` and `POST /me/credential` | One login endpoint for new and returning users; no half-registered state before the contact is proven. App Flow §3 note updated |
+| 2026-11-04 | Per-contact OTP limits are counted in MySQL (`otp_challenges`), per-IP limits by the rate-limit plugin | The per-contact count must hold across API tasks without Redis; per-IP is cheap in the plugin |
+| 2026-11-04 | Strict refresh rotation: a second use of any rotated token revokes the whole family, even in a race between two tabs | TRD §12.1 reuse detection. If web users hit this from parallel tabs, add a short grace window later |
+| 2026-11-04 | Public statute reads ignore the Authorization header; protected routes reject bad tokens with 401 | A stale token must never block reading the law |
+| 2026-11-04 | Development without JWT/OTP keys uses throwaway keys; `pnpm --filter @lawassist/api keys` prints a local set | Zero-setup local runs; staging/production refuse to boot without real keys |
 | 2026-11-04 | Statute read cache keyed by a per-Act generation the scraper bumps after each committed sync; TTL 1 h (TRD §11.3 updated) | Outbox-based invalidation would wait for TEI/Qdrant, so a TEI outage would keep stale law text cached. A lost bump is bounded by the TTL |
 | 2026-11-04 | `{act_id}` in statute URLs is the bdlaws Act id | Stable, public, and what the SRS calls `act_id` |
 | 2026-11-04 | Auth is an injected `Authenticate` function; `anonymous` until BE-03/04 | Routes and tests are written against the final shape; JWT verification plugs in without route changes |
@@ -123,6 +130,6 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 1. Merge `feature/data-01-spike` (DATA-01/03/04, SeaweedFS) once its PR is green.
 2. Decide the nightly-crawl scope (open item 1), then finish DATA-10.
 3. DATA-08: confirm the top-50 Act list, free disk for TEI (C: has 7.5 GB free; TEI needs ~6 GB), then `docker compose --profile ml up -d`, ingest and embed. Closes OPS-02 too.
-4. Merge `feature/api-core` (BE-05/06) after `feature/data-01-spike`.
-5. BE-07 retrieval (needs TEI for the dense arm and the reranker) and BE-03/04 auth (OTP with a mock SMS provider, ES256 JWT) — auth is fully unblocked.
+4. Merge in order: `feature/data-01-spike` → `feature/api-core` (BE-05/06) → `feature/auth` (BE-03/04).
+5. BE-07 retrieval (needs TEI for the dense arm and the reranker). Unblocked meanwhile: BE-12 conversations API and BE-15 cases API (auth now exists); QA-01 tenant-isolation suite alongside them.
 6. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.

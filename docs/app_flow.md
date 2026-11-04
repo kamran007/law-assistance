@@ -87,7 +87,7 @@ The **right panel** (`[Law Verifier]`) opens whenever a citation is clicked, any
 
 ## 3. Onboarding & Authentication Flow
 
-**API:** `POST /api/v1/auth/login` → returns JWT with role claim.
+**API (as built, BE-03/04):** `POST /api/v1/auth/otp/request` → `POST /api/v1/auth/otp/verify` (alias `/auth/login`) returns the tokens and `is_new_user`. The first verified code creates the account as `CITIZEN`; Profile Setup then calls `PATCH /me` (name) and, for Lawyers/Judges, `POST /me/credential` (status `PENDING` until an admin approves).
 
 ```text
 [Splash] (mobile only)

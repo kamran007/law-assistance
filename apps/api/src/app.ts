@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -14,6 +15,7 @@ import {
 } from 'fastify-type-provider-zod';
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
+import { authRoutes, type AuthRoutesDeps } from './modules/auth/routes';
 import { statuteRoutes, type StatuteRoutesDeps } from './modules/statutes/routes';
 import { ApiError, problem } from './problem';
 
@@ -24,6 +26,8 @@ export interface AppDeps {
   checkReady?: () => Promise<boolean>;
   /** Statute read API (BE-06). Omitted in tests of the bare skeleton. */
   statutes?: StatuteRoutesDeps;
+  /** OTP login, sessions and /me (BE-03/BE-04). */
+  auth?: AuthRoutesDeps;
   /** Shared rate-limit counters across API tasks (TRD §5.5). In-memory when omitted. */
   rateLimitRedis?: Redis;
 }
@@ -73,6 +77,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
     contentSecurityPolicy: { useDefaults: true },
   });
   await app.register(cors, { origin: [config.WEB_ORIGIN], credentials: true });
+  await app.register(cookie);
   await app.register(rateLimit, {
     ...DEFAULT_RATE_LIMIT,
     ...(deps.rateLimitRedis ? { redis: deps.rateLimitRedis, nameSpace: 'ratelimit:api:' } : {}),
@@ -126,6 +131,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
   );
 
   if (deps.statutes) await app.register(statuteRoutes(deps.statutes), { prefix: API_PREFIX });
+  if (deps.auth) await app.register(authRoutes(deps.auth), { prefix: API_PREFIX });
 
   return app;
 }
