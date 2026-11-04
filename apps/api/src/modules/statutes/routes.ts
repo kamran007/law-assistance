@@ -82,7 +82,7 @@ export const statuteRoutes =
 
     app.get(
       '/statutes',
-      { schema: { tags: ['statutes'], summary: 'Search or list Acts', querystring: statuteListQuery, response: { 200: statuteList } } },
+      { config: { access: 'public' }, schema: { tags: ['statutes'], summary: 'Search or list Acts', querystring: statuteListQuery, response: { 200: statuteList } } },
       async (req) => {
         const { total, items } = await repo.search(req.query);
         return { total, limit: req.query.limit, offset: req.query.offset, items: items.map(summary) };
@@ -91,7 +91,7 @@ export const statuteRoutes =
 
     app.get(
       '/statutes/:act_id',
-      { schema: { tags: ['statutes'], summary: 'Act detail with its chapter tree', params: actIdParam, response: { 200: statuteDetail } } },
+      { config: { access: 'public' }, schema: { tags: ['statutes'], summary: 'Act detail with its chapter tree', params: actIdParam, response: { 200: statuteDetail } } },
       async (req) => {
         const act = await actOr404(req.params.act_id);
         const outline = await repo.currentSectionOutline(act.statuteId);
@@ -110,6 +110,7 @@ export const statuteRoutes =
     app.get(
       '/statutes/:act_id/sections/:sec',
       {
+        config: { access: 'public' },
         schema: {
           tags: ['statutes'],
           summary: 'Verbatim section text (current, or as of a date for lawyers and judges)',
@@ -151,6 +152,7 @@ export const statuteRoutes =
     app.get(
       '/statutes/:act_id/sections/:sec/versions',
       {
+        config: { access: 'public' },
         schema: {
           tags: ['statutes'],
           summary: 'Version history of a section (lawyers and judges)',

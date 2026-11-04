@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { AppConfig } from '@lawassist/config';
-import Fastify, { type FastifyError } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import {
   hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
@@ -16,6 +16,8 @@ import {
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
 import { authRoutes, type AuthRoutesDeps } from './modules/auth/routes';
+import { caseRoutes, type CaseRoutesDeps } from './modules/cases/routes';
+import { conversationRoutes, type ConversationRoutesDeps } from './modules/conversations/routes';
 import { statuteRoutes, type StatuteRoutesDeps } from './modules/statutes/routes';
 import { ApiError, problem } from './problem';
 
@@ -28,11 +30,35 @@ export interface AppDeps {
   statutes?: StatuteRoutesDeps;
   /** OTP login, sessions and /me (BE-03/BE-04). */
   auth?: AuthRoutesDeps;
+  /** Case files (BE-15). */
+  cases?: CaseRoutesDeps;
+  /** General conversations (BE-12). */
+  conversations?: ConversationRoutesDeps;
   /** Shared rate-limit counters across API tasks (TRD §5.5). In-memory when omitted. */
   rateLimitRedis?: Redis;
 }
 
 export const API_PREFIX = '/api/v1';
+
+/**
+ * Who a route's data belongs to. Every route under /api/v1 must declare one in `config.access`;
+ * the tenant-isolation suite (QA-01) fails on unclassified routes and checks every `tenant` route
+ * with another user's ids.
+ * - public: reference data (statutes) or auth entry points
+ * - self:   the caller's own account (/me), no resource ids in the URL
+ * - tenant: user-owned resources addressed by id (cases, conversations, artifacts)
+ */
+export type RouteAccess = 'public' | 'self' | 'tenant';
+
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    access?: RouteAccess;
+  }
+  interface FastifyInstance {
+    /** Every route with its declared access class, collected at registration (QA-01). */
+    routeList: { method: string; url: string; access: RouteAccess | undefined }[];
+  }
+}
 
 /**
  * Safety-net limit per client for routes without their own limit. Route-specific limits from
@@ -62,6 +88,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  const routeList: FastifyInstance['routeList'] = [];
+  app.decorate('routeList', routeList);
+  app.addHook('onRoute', (r) => {
+    for (const method of [r.method].flat()) {
+      if (method !== 'HEAD') routeList.push({ method, url: r.url, access: r.config?.access });
+    }
+  });
 
   await app.register(swagger, {
     openapi: {
@@ -132,6 +166,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
 
   if (deps.statutes) await app.register(statuteRoutes(deps.statutes), { prefix: API_PREFIX });
   if (deps.auth) await app.register(authRoutes(deps.auth), { prefix: API_PREFIX });
+  if (deps.cases) await app.register(caseRoutes(deps.cases), { prefix: API_PREFIX });
+  if (deps.conversations) await app.register(conversationRoutes(deps.conversations), { prefix: API_PREFIX });
 
   return app;
 }

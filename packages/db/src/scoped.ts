@@ -152,6 +152,30 @@ export function scoped(db: Db, userId: string) {
       return row ?? null;
     },
 
+    /**
+     * The case's conversation, created if missing (TRD §5.1): a Lawyer/Judge approved after creating
+     * cases as a Citizen has cases without one. Returns null if the case isn't this user's. The DB
+     * trigger still rejects this for CITIZEN owners; callers check the role first.
+     */
+    async ensureForCase(caseFileId: string): Promise<Conversation | null> {
+      const existing = await conversationsRepo.findForCase(caseFileId);
+      if (existing) return existing;
+      const owned = await caseFilesRepo.findById(caseFileId);
+      if (!owned) return null;
+      try {
+        await db.insert(conversations).values({
+          conversationId: newId(),
+          ownerUserId: userId,
+          caseFileId,
+          title: owned.title ?? owned.caseNumber ?? null,
+        });
+      } catch (err) {
+        // UNIQUE(case_file_id): a concurrent call created it first.
+        if ((err as { cause?: { errno?: number } }).cause?.errno !== 1062) throw err;
+      }
+      return conversationsRepo.findForCase(caseFileId);
+    },
+
     async rename(id: string, title: string): Promise<boolean> {
       const [res] = await db.update(conversations).set({ title }).where(ownConversation(id));
       return res.affectedRows === 1;

@@ -96,7 +96,7 @@ export const authRoutes =
       '/auth/otp/request',
       {
         // TRD §5.5: 10 per hour per IP here; 3 per 10 min per identifier is enforced in the service.
-        config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+        config: { access: 'public', rateLimit: { max: 10, timeWindow: '1 hour' } },
         schema: {
           tags: ['auth'],
           summary: 'Send a one-time code by SMS or email',
@@ -119,7 +119,7 @@ export const authRoutes =
       return sendSession(reply, s, body.client, { is_new_user: s.isNewUser });
     };
     const verifyOpts = (summary: string) => ({
-      config: { rateLimit: { max: 30, timeWindow: '10 minutes' } },
+      config: { access: 'public' as const, rateLimit: { max: 30, timeWindow: '10 minutes' } },
       schema: { tags: ['auth'], summary, body: verifyBody, response: { 200: session } },
     });
     app.post('/auth/otp/verify', verifyOpts('Verify the code and sign in (creates the account on first login)'), async (req, reply) => verify(req.body, reply));
@@ -129,7 +129,7 @@ export const authRoutes =
     app.post(
       '/auth/refresh',
       {
-        config: { rateLimit: { max: 60, timeWindow: '10 minutes' } },
+        config: { access: 'public', rateLimit: { max: 60, timeWindow: '10 minutes' } },
         schema: {
           tags: ['auth'],
           summary: 'Rotate the refresh token (body for mobile, cookie for web)',
@@ -154,7 +154,7 @@ export const authRoutes =
 
     app.post(
       '/auth/logout',
-      { schema: { tags: ['auth'], summary: 'End this login session on every device that shares it', response: { 204: z.null() } } },
+      { config: { access: 'self' }, schema: { tags: ['auth'], summary: 'End this login session on every device that shares it', response: { 204: z.null() } } },
       async (req, reply) => {
         const p = requireAuth(await deps.authenticate(req));
         if (p.sessionId) await service.logout(p.sessionId);
@@ -163,7 +163,7 @@ export const authRoutes =
       },
     );
 
-    app.get('/me', { schema: { tags: ['me'], summary: 'My profile and verification status', response: { 200: me } } }, async (req) => {
+    app.get('/me', { config: { access: 'self' }, schema: { tags: ['me'], summary: 'My profile and verification status', response: { 200: me } } }, async (req) => {
       const p = requireAuth(await deps.authenticate(req));
       return toMe(await service.me(p.userId));
     });
@@ -171,6 +171,7 @@ export const authRoutes =
     app.patch(
       '/me',
       {
+        config: { access: 'self' },
         schema: {
           tags: ['me'],
           summary: 'Update my name or language (the role cannot be changed here)',
@@ -187,6 +188,7 @@ export const authRoutes =
     app.post(
       '/me/credential',
       {
+        config: { access: 'self' },
         schema: {
           tags: ['me'],
           summary: 'Submit a Bar Council enrollment number or Judicial ID for verification',

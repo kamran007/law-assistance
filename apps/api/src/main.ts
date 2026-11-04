@@ -44,6 +44,8 @@ const app = await buildApp(config, {
     authenticate,
     secureCookies: !dev,
   },
+  cases: { db, authenticate, today: dhakaToday },
+  conversations: { db, authenticate },
 });
 if (dev && (!config.JWT_PRIVATE_KEY || !config.OTP_HMAC_KEY)) {
   app.log.warn('JWT/OTP keys not set: using throwaway keys; sessions end when the API restarts');

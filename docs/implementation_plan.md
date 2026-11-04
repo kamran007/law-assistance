@@ -138,11 +138,11 @@ These items block engineering milestones. Start them in **Week 1**.
 - [ ] **BE-09** **Relay checks** (feeds decision D10): confirm `claude-opus-5-5` is accepted unchanged, prompt caching works (cache-read tokens > 0 on repeat), effort/thinking provider options are forwarded, added latency is measured · *Output:* short report in `docs/relay-verification.md`
 - [ ] **BE-10** Role system prompts v1 (CITIZEN / LAWYER / JUDGE) in `packages/prompts` — **LEGAL reviews**
 - [ ] **BE-11** Streaming citation validator (`TransformStream`, `[n]` buffering, invalid-marker stripping, flags, metrics) (TRD §7.4) · *Done when:* unit tests for split brackets and unknown refs pass
-- [ ] **BE-12** Conversations API: general conversations CRUD, case conversation auto-created with each Lawyer/Judge case, Citizen blocked (TRD §4.2, §5.1)
+- [x] **BE-12** Conversations API: general conversations CRUD, case conversation auto-created with each Lawyer/Judge case, Citizen blocked (TRD §4.2, §5.1)
 - [ ] **BE-13** `POST /assistant/query` SSE: meta/token/citation/done/error events, abort on client disconnect → `INTERRUPTED`, NO_PROVISION path, message persistence with usage telemetry
 - [ ] **BE-14** Case context builder (case JSON + drafts summary + offense date → as-of retrieval) + conversation summarization job (TRD §7.2)
-- [ ] **BE-15** Cases API: CRUD, `If-Match` optimistic concurrency, `updated_since` sync, soft-delete tombstones (TRD §5.4)
-- [ ] **QA-01** **Tenant isolation suite** across every route + route-coverage check in CI (TRD §4.3)
+- [x] **BE-15** Cases API: CRUD, `If-Match` optimistic concurrency, `updated_since` sync, soft-delete tombstones (TRD §5.4)
+- [x] **QA-01** **Tenant isolation suite** across every route + route-coverage check in CI (TRD §4.3)
 
 ### Web
 - [ ] **WEB-01** Next.js scaffold, Tailwind, `next-intl` (BN/EN), Noto Sans Bengali, typed API client from `packages/contracts`
