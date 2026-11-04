@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { HttpError, MemoryConditionalCache, PoliteHttpClient, RobotsDisallowedError, type FetchLike } from '../src/scrape/http-client';
+import { decodeBody, HttpError, MemoryConditionalCache, PoliteHttpClient, RobotsDisallowedError, type FetchLike } from '../src/scrape/http-client';
 import { IntervalLimiter } from '../src/scrape/rate-limiter';
 import { MemorySnapshotStore, snapshotKey } from '../src/scrape/snapshot-store';
 import { DEFAULT_SOURCE_CONFIG, loadSourceConfig } from '../src/scrape/source-config';
 
-type Reply = { status: number; body?: string; headers?: Record<string, string> } | Error;
+type Reply = { status: number; body?: string | Uint8Array; headers?: Record<string, string> } | Error;
+
+const bytesOf = (body: string | Uint8Array | undefined): ArrayBuffer => {
+  const u8 = typeof body === 'string' || body === undefined ? new TextEncoder().encode(body ?? '') : body;
+  return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
+};
 
 /** Fake fetch: per-URL reply queues; records every call. */
 function fakeFetch(routes: Record<string, Reply[]>) {
@@ -13,11 +18,27 @@ function fakeFetch(routes: Record<string, Reply[]>) {
     calls.push({ url, headers: init.headers });
     const queue = routes[url] ?? [];
     const reply = queue.length > 1 ? queue.shift()! : queue[0];
-    if (!reply) return { status: 404, headers: new Headers(), text: async () => '' };
+    if (!reply) return { status: 404, headers: new Headers(), arrayBuffer: async () => bytesOf('') };
     if (reply instanceof Error) throw reply;
-    return { status: reply.status, headers: new Headers(reply.headers ?? {}), text: async () => reply.body ?? '' };
+    return { status: reply.status, headers: new Headers(reply.headers ?? {}), arrayBuffer: async () => bytesOf(reply.body) };
   };
   return { fetch, calls };
+}
+
+/** "<p>আইন</p>" as UTF-16 big-endian bytes, optionally with a BOM: how bdlaws serves index pages. */
+function utf16be(text: string, bom: boolean): Uint8Array {
+  const out = new Uint8Array((bom ? 2 : 0) + text.length * 2);
+  let o = 0;
+  if (bom) {
+    out[o++] = 0xfe;
+    out[o++] = 0xff;
+  }
+  for (let k = 0; k < text.length; k++) {
+    const c = text.charCodeAt(k);
+    out[o++] = c >> 8;
+    out[o++] = c & 0xff;
+  }
+  return out;
 }
 
 const BASE = DEFAULT_SOURCE_CONFIG.baseUrl;
@@ -45,6 +66,20 @@ describe('PoliteHttpClient', () => {
     expect(res).toMatchObject({ kind: 'ok', body: '<html>ok</html>' });
     expect(calls.map((c) => c.url)).toEqual([ROBOTS, PAGE]);
     expect(calls[1]!.headers['user-agent']).toBe(DEFAULT_SOURCE_CONFIG.userAgent);
+  });
+
+  it('decodes UTF-16 pages by BOM or charset, not as UTF-8 (bdlaws index and detail pages)', async () => {
+    const page = '<a href="/act-835.html">নারী ও শিশু নির্যাতন দমন আইন, ২০০০</a>';
+    const { http } = client({
+      [ROBOTS]: [{ status: 404 }],
+      [PAGE]: [{ status: 200, body: utf16be(page, true), headers: { 'content-type': 'text/html;charset=UTF-16' } }],
+    });
+    expect(await http.get(PAGE)).toMatchObject({ kind: 'ok', body: page });
+
+    expect(decodeBody(utf16be(page, false), 'text/html; charset=UTF-16')).toBe(page);
+    expect(decodeBody(new TextEncoder().encode(page), 'text/html;charset=UTF-8')).toBe(page);
+    expect(decodeBody(new TextEncoder().encode(page), null)).toBe(page);
+    expect(decodeBody(new TextEncoder().encode('ok'), 'text/html; charset=x-unknown')).toBe('ok');
   });
 
   it('honours robots.txt disallow rules', async () => {

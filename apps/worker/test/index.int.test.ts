@@ -54,7 +54,7 @@ const html = readFileSync(new URL('./fixtures/act-print-en.html', import.meta.ur
 const parse = (h: string) => parseActPrint(h, { bdlawsActId: 11, sourceUrl: 'http://x/act-print-11.html' }, cfg);
 const amended = html
   .replace('which may extend to seven years', 'which may extend to <sup>3</sup>[ten years]')
-  .replace('</ol>', '<li><sup>3</sup> Substituted by the Penal Code (Amendment) Act, 2025 (Act No. 3 of 2025), with effect from 1st March, 2025</li></ol>');
+  .replace('</ul>', "<li class='footnoteList'><h6 class='word-formet'> <sup class='en'>3</sup> </h6>Substituted by the Penal Code (Amendment) Act, 2025 (Act No. 3 of 2025), with effect from 1st March, 2025</li></ul>");
 
 let mysql: StartedMySqlContainer;
 let qdrantC: StartedQdrantContainer;

@@ -33,14 +33,25 @@ services:
     ports: ['6333:6333', '6334:6334']
     volumes: [qdrant-data:/qdrant/storage]
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address :9001
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports: ['9000:9000', '9001:9001']
-    volumes: [minio-data:/data]
+  # S3-compatible object store for local dev (snapshots, uploads). MinIO stopped publishing
+  # community images, so this uses SeaweedFS. No identities are configured, so its S3 API accepts
+  # any credentials: local use only. Host port 9000 keeps S3_ENDPOINT unchanged.
+  s3:
+    image: chrislusf/seaweedfs:3.99
+    command: ['server', '-dir=/data', '-s3', '-s3.port=8333']
+    ports: ['9000:8333']
+    volumes: [s3-data:/data]
+
+  # Creates the dev bucket once the store is up (no app code creates buckets; Terraform does in AWS).
+  s3-init:
+    image: chrislusf/seaweedfs:3.99
+    depends_on: [s3]
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >-
+        until echo 's3.bucket.list' | weed shell -master=s3:9333 >/dev/null 2>&1; do sleep 1; done;
+        echo 's3.bucket.create -name lawassist-dev' | weed shell -master=s3:9333
+    restart: 'no'
 
   tei-embed:
     profiles: [ml]
@@ -59,5 +70,5 @@ services:
 volumes:
   mysql-data:
   qdrant-data:
-  minio-data:
+  s3-data:
   tei-cache:

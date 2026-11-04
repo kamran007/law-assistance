@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "generate": "drizzle-kit generate",
-    "migrate": "tsx src/migrate.ts"
+    "migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts"
   },
   "dependencies": {
     "@lawassist/config": "workspace:*",
