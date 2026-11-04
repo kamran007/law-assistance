@@ -25,7 +25,10 @@ const parse = (h: string, actId = 11) => parseActPrint(h, { bdlawsActId: actId, 
 /** s.420 amended: new punishment + a dated substitution footnote. */
 const amended = html
   .replace('which may extend to seven years', 'which may extend to <sup>3</sup>[ten years]')
-  .replace('</ol>', '<li><sup>3</sup> Substituted by the Penal Code (Amendment) Act, 2025 (Act No. 3 of 2025), with effect from 1st March, 2025</li></ol>');
+  .replace('</ul>', "<li class='footnoteList'><h6 class='word-formet'> <sup class='en'>3</sup> </h6>Substituted by the Penal Code (Amendment) Act, 2025 (Act No. 3 of 2025), with effect from 1st March, 2025</li></ul>");
+
+/** Fake fetch bodies are bytes, like a real response (the client decodes them by charset). */
+const toArrayBuffer = (text: string): ArrayBuffer => new TextEncoder().encode(text).buffer as ArrayBuffer;
 
 const versionsOf = (statuteId: string, key: string) =>
   db
@@ -174,7 +177,7 @@ describe('Sprint 1 demo flow via runScrape', () => {
     const fetch: FetchLike = async (url) => ({
       status: pages[url] ? 200 : 404,
       headers: new Headers(),
-      text: async () => pages[url] ?? '',
+      arrayBuffer: async () => toArrayBuffer(pages[url] ?? ''),
     });
     const snapshots = new MemorySnapshotStore();
     const log = { info: () => undefined, warn: () => undefined, error: () => undefined };
@@ -213,7 +216,7 @@ describe('Sprint 1 demo flow via runScrape', () => {
     const fetch: FetchLike = async (url) => ({
       status: url.endsWith('robots.txt') ? 404 : url.includes('act-print-600') ? 200 : 404,
       headers: new Headers(),
-      text: async () => (url.includes('act-print-600') ? html : ''),
+      arrayBuffer: async () => toArrayBuffer(url.includes('act-print-600') ? html : ''),
     });
     const deps: ScrapeDeps = {
       db,

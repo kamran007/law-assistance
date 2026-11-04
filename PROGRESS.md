@@ -3,7 +3,7 @@
 Live status of the build. Task IDs come from [docs/implementation_plan.md](docs/implementation_plan.md), which carries the matching checkboxes.
 Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ not started · ⛔ blocked
 
-**Current sprint:** S2 (Weeks 3–4) — Corpus Live, Auth & Retrieval Core. S1 code is merged; S1 leftovers: DATA-01 live check, BE-02 grants test, OPS-02
+**Current sprint:** S2 (Weeks 3–4) — Corpus Live, Auth & Retrieval Core. S1 is closed except OPS-02 (TEI profile not run) and OPS-04 (Terraform)
 **Last updated:** 2026-11-04
 
 ---
@@ -13,17 +13,17 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | ID | Task | Status | Evidence / Notes |
 | :--- | :--- | :---: | :--- |
 | OPS-01 | Monorepo layout | 🟡 | pnpm workspace with `apps/{api,worker}`, `packages/{config,legal-text,db}`. Still missing: `apps/web`, `packages/{contracts,providers,prompts}`, `mobile/`, `infra/`, `evals/` (created when their tasks start) |
-| OPS-02 | docker-compose | 🟡 | `docker-compose.yml` written (mysql 8.4 + ngram, redis, qdrant, minio, TEI under `--profile ml`). **Not yet run: Docker Desktop was not running** |
+| OPS-02 | docker-compose | 🟡 | **Default profile verified 2026-11-04:** `docker compose up -d` → mysql 8.4 (healthy), redis (healthy), qdrant, s3 + bucket created by `s3-init`. **MinIO replaced by SeaweedFS 3.99**: the pinned `minio/minio` image (and every MinIO tag tried on Docker Hub and quay.io) can no longer be pulled. Still open: `--profile ml` (TEI) not run |
 | OPS-03 | CI pipeline | ✅ | `.github/workflows/ci.yml` (lint, typecheck, unit, Testcontainers integration, Gitleaks, Semgrep). **Done-when met:** PR #4 green in ~1.5 min (all steps incl. integration and security). Trivy is added when Docker images exist |
 | OPS-04 | Terraform base | ⬜ | |
 | OPS-05 | Zod-validated config | ✅ | `packages/config`; 5 tests; errors never echo secret values; secrets required in staging/prod |
 | BE-01 | Drizzle schema (17 tables) | ✅ | `packages/db/src/schema/*`, migrations `0000_init.sql` + `0001_fulltext_and_triggers.sql`. **Verified on CI (`main` @ `c8d5f1f`):** migrations apply cleanly to empty MySQL 8.4; `db.int.test.ts` 9/9 (one-current-version index, ngram FULLTEXT, tenant isolation, optimistic concurrency) |
-| BE-02 | DB grants + citizen trigger | 🟡 | Trigger ✅ (CI). Grants: `apps/worker/test/grants.int.test.ts` applies `grants.sql` to MySQL 8.4 and runs the real code paths as each user: scraper = `syncAct`, worker = `drainOutbox`, api = scoped case + conversation, migrate = DDL. Also checks every denial (user tables, Schedule II, outbox update, append-only `audit_log`, DDL, other schemas). **Found and fixed:** one worker process ran scraper + outbox on a single DB user, but no user has both rights → new `SCRAPER_DATABASE_URL`. Test written on `fix/db-grants`, awaiting its first CI run |
+| BE-02 | DB grants + citizen trigger | ✅ | Trigger ✅ (CI). Grants: `apps/worker/test/grants.int.test.ts` applies `grants.sql` to MySQL 8.4 and runs the real code paths as each user (scraper = `syncAct`, worker = `drainOutbox`, api = scoped case + conversation, migrate = DDL) and checks every denial. **Verified:** CI green on `main` (PR #5 merge `85af65e`: check + security) and locally on 2026-11-04 (`pnpm test:integration`: 4 files / 38 tests). Deployed envs need `SCRAPER_DATABASE_URL` (app_scraper) for the worker |
 | BE-02a | Scoped repositories + lint ban | ✅ | `packages/db/src/scoped.ts`; ESLint `no-restricted-imports` verified to fail on a deliberate violation |
-| DATA-01 | bdlaws URL/HTML spike | ⛔ | URL patterns + selectors written as config (`apps/worker/src/scrape/source-config.ts`), doc in `apps/worker/src/scrape/README.md`. **Live check blocked:** robots.txt answered once (`Allow: /`), then every page request timed out or was reset. Selectors are unverified assumptions |
+| DATA-01 | bdlaws URL/HTML spike | ✅ | **Done 2026-11-04** (portal reachable again). 9 real Acts + the chronological index saved as gzip fixtures (`apps/worker/test/fixtures/bdlaws/`, 616 KB). Findings in `apps/worker/src/scrape/README.md`: index/detail pages are **UTF-16BE**; no ETag/Last-Modified; discovery via the chronological index (1,685 Acts); title/preamble/footnote selectors were wrong; chapters nest in rows; sections split over rows; `171-I`; ranges; two Bangla terminators. No Bangla Act with `১১ক`-style sections in the sample (the synthetic fixture covers it) |
 | DATA-02 | legal-text normalizer & hashing | ✅ | 27 tests; 95.3% statement coverage |
-| DATA-03 | Crawler worker | 🟡 | `apps/worker`: undici client, global 1 req/s limiter, robots.txt (refuses to crawl if unreachable), ETag/Last-Modified in Redis, backoff 2s→60s + jitter + Retry-After, gzip snapshots to S3 (`raw/bdlaws/{id}/{ts}.html.gz`), BullMQ schedulers (nightly 02:00, weekly full Fri 03:00 Asia/Dhaka), CLI. 11 unit tests with a fake fetch. Not yet run against the portal, MinIO or Redis |
-| DATA-04 | Cheerio parser | 🟡 | `parser.ts` (Act → Chapter → Section → Sub-section/Proviso/Explanation/Illustration → Footnotes) + `legal-text/footnote.ts` (action, amending Act, "with effect from" date, Bangla and English). Markers stripped for hashing only. 13 parser tests + 21 footnote/date tests on EN/BN fixtures. **Fixtures are hand-made; must be re-checked against real snapshots (DATA-01)** |
+| DATA-03 | Crawler worker | ✅ | **Verified 2026-11-04 against the live portal, MySQL, Redis and S3:** 9 Acts in 2 min 11 s, 0 failures; re-run 0 changes. Fixed: bodies decoded by BOM/charset (`decodeBody`), not `text()`; timeout 60 → 120 s (CrPC print view takes 41 s). Conditional GET is wired but never applies: the portal sends no validators |
+| DATA-04 | Cheerio parser | ✅ | **Verified on 9 real Acts** (1,804 sections; the only warning is a portal defect: CrPC s.88 cites footnote 107, which the list lacks). Reworked for the real markup: nested chapters, clbr/na paragraphs, continuation rows (their notes in the hash), `171-I`, ranges, stray notes, U+09F7 terminator, repealed row classes. 32 parser tests incl. a real-snapshot regression suite. Known gap: `act-section-head` sub-headings (CPC Parts) not captured |
 | DATA-05 | Versioning transaction + outbox | ✅ | `versioning.ts`: read-only plan, then 20% safety valve (quarantine, nothing written), then one REPEATABLE READ tx per section with `FOR UPDATE` + outbox (CREATED / CLOSED / NOTIFY_AFFECTED_CASES / STATUTE_STATUS_CHANGED), retry on dup-key/deadlock. **Verified on GitHub Actions 2026-11-03:** `versioning.int.test.ts` 10/10 passed against MySQL 8.4 (amend → archive → new current, 4 concurrent workers, concurrent first ingest, safety valve, removal, repeal, Sprint 1 demo via `runScrape`). Plan logic: 10 unit tests |
 | — | API skeleton (early part of BE-05) | ✅ | `apps/api`: Fastify + Zod, helmet, CORS, RFC 9457 errors, `/health`, `/ready`, log redaction; 5 tests |
 
@@ -33,7 +33,7 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | :--- | :--- | :---: | :--- |
 | DATA-06 | Chunker + outbox worker → TEI → Qdrant | ✅ | Merged (PR #4). `apps/worker/src/index/{chunker,indexer,outbox}.ts` + `packages/providers`. **Verified on CI:** `index.int.test.ts` passed against MySQL 8.4 + Qdrant 1.15: indexing, **outbox replay idempotent** (same ids/rows/points, no re-embed), point-in-time filters incl. `valid_to` boundary, repeal propagation, failure/retry. TEI client unit-tested; real TEI not yet run (CI uses a deterministic fake embedder) |
 | DATA-07 | Qdrant collection setup + `reindex --all` | ✅ | Merged (PR #4). Alias → timestamped collection, HNSW m=16/ef_construct=128, payload indexes, `reindexAll` with catch-up + alias swap. Verified in `index.int.test.ts` on CI |
-| DATA-08 | Ingest top 50 Acts | ⛔ | Needs DATA-01 (portal reachable) and TEI running (`docker compose --profile ml`) |
+| DATA-08 | Ingest top 50 Acts | ⬜ | Unblocked: portal reachable, scraper verified. Needs TEI (`docker compose --profile ml`) for embeddings, and the 50 Act ids looked up on the chronological index |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
 
 ## Case law (Module D) — planned for S3–S4
@@ -52,22 +52,25 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | WEB-12 / MOB-13 | Case-law UI (web / mobile) | ⬜ | S4 / S6 |
 | EVAL-09 / EVAL-10 | Case-law and judgment-metadata evals | ⬜ | EVAL-09 needs PRE-12 (LEGAL question set) |
 
-## Verification snapshot (2026-11-03)
+## Verification snapshot (2026-11-04)
 
 | Check | Result |
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit) | ✅ 92 / 92 passed (7 files) |
+| `pnpm test` (unit) | ✅ 130 / 130 passed (9 files) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
-| Worker CLI smoke test | ✅ config + wiring load. Fails at the first DB query, as expected with no MySQL |
+| `pnpm test:integration` (local Docker) | ✅ 4 files / 38 tests (db, versioning, index, grants) |
+| Sprint 1 demo (live portal, local stack) | ✅ 9 Acts → 1,804 sections; re-run 0 changes; edited snapshot → Penal Code s.420 v2 current (`DETECTED_ON_SYNC`), v1 `valid_to` 2026-11-04; outbox CLOSED + NOTIFY_AFFECTED_CASES |
+| Semgrep 1.183 (Docker image, `apps/worker/src/scrape`) | ✅ 0 findings |
+| Scraper coverage (parser / http-client / discover) | 94% / 99% / 100% lines |
 
 ## Open items & blockers
 
-1. **Start Docker Desktop** for local integration runs and OPS-02 (`docker compose up`). CI already runs the integration tests.
-2. **bdlaws unreachable from the dev network** (DATA-01). Try another network or a VPN egress in BD. Without it, the parser selectors stay unverified.
+1. **Nightly crawl = full crawl** (about 5–6 h for 1,685 Acts) because the portal sends no validators, and it overlaps the Friday weekly job. Proposal in `apps/worker/src/scrape/README.md` (nightly = new Act ids + the Acts they amend + top 50; weekly = full). Needs a decision before DATA-10 closes.
+2. **Sub-headings not captured** (`act-section-head`): every CPC section carries chapter "PRELIMINARY". Display only; fixing it creates no versions.
 3. **PRE-01: rotate the AI relay API key** that was pasted into chat. Store new keys only in `.env` (git-ignored) or Secrets Manager.
 4. `main` CI fully green since PR #3 (`46856b0`).
 5. RDS later needs `log_bin_trust_function_creators=1` so migrations can create triggers (noted in `grants.sql`).
@@ -101,12 +104,17 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-03 | Bangla sub-section letters map ক→A, খ→B, … in consonant order | Matches inserted-section convention (৩২৬ক = 326A). **LEGAL to confirm beyond ঙ** |
 | 2026-11-04 | Case law in MVP scope: SCOB reported judgments (AD + HCD) only (D12). New Module D, tasks `JUD-01..07` (DATA-* IDs were all taken) | Statutes alone don't show how courts read them; SCOB is the Supreme Court's own free, public law report. Translations, unreported judgments and paid reports stay post-MVP |
 | 2026-11-04 | Judgments get their own tables and Qdrant collection (`judgment_chunks`), not mixed into `section_chunks`; no point-in-time filter, instead a "decided on an earlier version" flag | Judgments aren't versioned law; separate payloads and a separate retrieval arm keep the statute path and its evals unchanged |
+| 2026-11-04 | Local S3 = SeaweedFS 3.99 (`chrislusf/seaweedfs`), not MinIO; `s3-init` creates the bucket | MinIO no longer publishes pullable community images. SeaweedFS is Apache-2.0, one container, S3 API on host port 9000, so `S3_ENDPOINT` is unchanged. AWS uses real S3 |
+| 2026-11-04 | HTTP bodies decoded from bytes (BOM → charset → UTF-8); `FetchLike` returns `arrayBuffer()` | bdlaws serves index/detail pages as UTF-16BE; `text()` would silently garble them |
+| 2026-11-04 | A section row without a number continues the section above; its marginal note goes into the hash. Display heading = first row’s note | The portal splits sections over rows. Single-row sections hash exactly as before |
+| 2026-11-04 | Range rows (`23 and 24.`, `100-103.`) become one section per number, with the shared text | A lookup of CrPC s.24 must find its "[Repealed]" text |
+| 2026-11-04 | Discovery uses only the chronological index | The main index lists volumes only; the alphabetical index is about 57 MB |
 | 2026-11-04 | Judgments add to an answer but never replace the statute citation or bypass the NO_PROVISION gate | Keeps SRS NFR 1 (every statutory claim cited to `statute_sections`) intact |
 
 ## Next steps (in order)
 
-1. Open the PR for `fix/db-grants`; merge when CI is green. Closes BE-02. Deployed envs must then set `DATABASE_URL` (app_worker) and `SCRAPER_DATABASE_URL` (app_scraper) for the worker.
-2. DATA-01: from a network that reaches bdlaws, save the 10 spike Acts as fixtures, then correct selectors and URL patterns (checklist in `apps/worker/src/scrape/README.md`).
-3. Run the Sprint 1 demo for real: `docker compose up -d` → `pnpm db:migrate` → `pnpm --filter @lawassist/worker scrape -- --acts <10 ids>` twice → edit a snapshot → `--act <id> --snapshot <key>`.
-4. Then Sprint 2: DATA-06 chunker + outbox worker → TEI → Qdrant.
+1. Merge `feature/data-01-spike` (DATA-01/03/04, SeaweedFS) once its PR is green.
+2. Decide the nightly-crawl scope (open item 1), then finish DATA-10.
+3. DATA-08: pick the top-50 Act ids from the chronological index, start `docker compose --profile ml` (TEI), ingest and embed. Closes OPS-02 too.
+4. Sprint 2 API core, unblocked: BE-05 (Fastify skeleton) → BE-06 (statutes read API) → BE-07 (retrieval).
 5. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.

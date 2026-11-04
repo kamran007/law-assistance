@@ -57,11 +57,34 @@ const BN_LETTER = /\p{Script=Bengali}/gu;
 const LATIN_LETTER = /[A-Za-z]/g;
 
 /**
- * "420." / "৪২০।" / "[326A." / "561 A -" at the start of a section body. Inputs are already trimmed
- * and whitespace-collapsed. The pattern is anchored with bounded quantifiers and no two unbounded
- * quantifiers over the same characters, so matching is linear (no ReDoS).
+ * bdlaws ends Bangla section numbers with either the danda (U+0964) or U+09F7, a different character
+ * that looks the same ("১৷"). Built from its code point so the source shows which one it is.
  */
-const SECTION_NUMBER = /^[[(]?\s?([0-9০-৯]{1,4}\s?[A-Zক-ঞ]{0,2})\s?[.।:-]/u;
+const BN_DANDA_LOOKALIKE = String.fromCodePoint(0x09f7);
+
+/**
+ * "420." / "৪২০।" / "১৷" / "[326A." / "561 A -" / "171-I." at the start of a section body. The
+ * portal writes a letter I with a hyphen ("171-I") so it isn't read as "171l". Inputs are already
+ * trimmed and whitespace-collapsed. The pattern is anchored with bounded quantifiers and no two
+ * unbounded quantifiers over the same characters, so matching is linear (no ReDoS). It is built from
+ * constants only (no input), so the RegExp constructor is safe here.
+ */
+// nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- constant pattern, see above
+const SECTION_NUMBER = new RegExp(
+  String.raw`^[[(]?\s?([0-9০-৯]{1,4}(?:\s?[A-Zক-ঞ]{1,2}|-[A-Z]{1,2})?)\s?[.।${BN_DANDA_LOOKALIKE}:-]`,
+  'u',
+);
+
+/** "23 and 24. [Repealed …]" / "100-103. [Omitted …]": one row standing for several spent sections. */
+const SECTION_RANGE = /^\[?\s?([0-9]{1,4})\s?(and|to|-|–)\s?([0-9]{1,4})\s?\./u;
+const MAX_RANGE = 30;
+
+/** Short lines a stray marginal note can occupy before a section number ("“Payee”" ⏎ "8. The …"). */
+const MAX_STRAY_NOTE_LINES = 2;
+const MAX_STRAY_NOTE_LENGTH = 60;
+/** Rows before the first section that are not sections. */
+const PREAMBLE_HEADING = /^(?:Preamble|প্রস্তাবনা)$/iu;
+
 const SUBSECTION = /^\(\s*([0-9০-৯]{1,3}[a-zক-ঞ]?)\s*\)/u;
 const PROVISO = /^(?:\[?\s*Provided\b|তবে শর্ত)/u;
 const EXPLANATION = /^(?:\[?\s*Explanation\b|ব্যাখ্যা)/u;
@@ -75,7 +98,9 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
   const sel = cfg.selectors;
   const warnings: string[] = [];
 
-  const title = normalizeForDisplay($(sel.title).first().text());
+  // The title carries Act-wide footnote markers ("1The Penal Code, 1860"); drop them.
+  const titleEl = $(sel.title).first();
+  const title = titleEl.length ? normalizeForDisplay(withoutMarkers(titleEl, sel.footnoteMarker).text()) : '';
   if (!title) warnings.push('title not found');
   const preamble = $(sel.preamble)
     .toArray()
@@ -83,16 +108,26 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
     .join(' ');
 
   const footnoteTexts = collectFootnotes($, sel.footnote, sel.footnoteMarker);
-  const sections: ParsedSection[] = [];
+  const drafts: SectionDraft[] = [];
   const seenKeys = new Set<string>();
+  let current: SectionDraft | null = null;
   let chapter: string | null = null;
+  let sectionBlocks = 0;
+  let repealedBlocks = 0;
 
   $(`${sel.chapter}, ${sel.section}`).each((i, el) => {
     const node = $(el);
     if (!node.is(sel.section)) {
-      chapter = normalizeForDisplay(node.text()) || chapter;
+      // A chapter heading nested in a section block was already applied when that block was visited
+      // (document order visits the block before its children).
+      if (!node.parents(sel.section).length) chapter = normalizeForDisplay(node.text()) || chapter;
       return;
     }
+    sectionBlocks++;
+    if (node.is(sel.repealedSection)) repealedBlocks++;
+    const nestedChapter = node.find(sel.chapter).first();
+    if (nestedChapter.length) chapter = normalizeForDisplay(nestedChapter.text()) || chapter;
+
     const headingEl = node.find(sel.sectionHeading).first();
     const bodyEl = node.find(sel.sectionBody).first();
     if (!bodyEl.length) {
@@ -100,51 +135,81 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
       return;
     }
 
-    const markers = new Set<string>();
+    const markers: string[] = [];
     for (const m of [...headingEl.find(sel.footnoteMarker).toArray(), ...bodyEl.find(sel.footnoteMarker).toArray()]) {
       const n = toAsciiDigits($(m).text()).replace(/\D/g, '');
-      if (n) markers.add(n);
+      if (n) markers.push(n);
     }
 
     const heading = normalizeForDisplay(headingEl.text()) || null;
-    const displayLines = paragraphs($, bodyEl);
+    const displayLines = paragraphs($, bodyEl, sel.lineBreak);
     // Footnote reference markers are stripped for hashing only (TRD §6.2 step 2).
-    const hashLines = paragraphs($, withoutMarkers(bodyEl, sel.footnoteMarker));
+    const hashLines = paragraphs($, withoutMarkers(bodyEl, sel.footnoteMarker), sel.lineBreak);
     const hashHeading = headingEl.length ? normalizeForDisplay(withoutMarkers(headingEl, sel.footnoteMarker).text()) : '';
+    if (!hashLines.length) return; // empty layout row
 
-    const numberMatch = SECTION_NUMBER.exec(hashLines[0] ?? '') ?? SECTION_NUMBER.exec(hashHeading);
-    const sectionNumber = numberMatch?.[1]?.replace(/\s+/g, '') ?? null;
-    const key = sectionNumber ? normalizeSectionKey(sectionNumber) : null;
-    if (!sectionNumber || !key) {
-      warnings.push(`section block #${i}: no section number`);
+    const range = SECTION_RANGE.exec(hashLines[0]!);
+    const rangeNumbers = range ? expandRange(range) : null;
+    let sectionNumber = rangeNumbers?.[0] ?? matchedNumber(SECTION_NUMBER.exec(hashLines[0]!) ?? SECTION_NUMBER.exec(hashHeading));
+
+    if (!sectionNumber && current && displayLines.length === hashLines.length) {
+      // A stray marginal note printed on its own line(s) before the number ("“Payee”" ⏎ "8. The
+      // “holder” …"). Accept it only as the start of a new, later, unseen section, so a numbered
+      // line inside a continuation is never split off. The note lines join the previous section's
+      // marginal notes (hash only), not any section body.
+      for (let j = 1; j <= MAX_STRAY_NOTE_LINES && j < hashLines.length; j++) {
+        if (hashLines[j - 1]!.length > MAX_STRAY_NOTE_LENGTH) break;
+        const n = matchedNumber(SECTION_NUMBER.exec(hashLines[j]!));
+        if (!n) continue;
+        const k = normalizeSectionKey(n);
+        if (k && !seenKeys.has(k) && sectionOrdinal(n) > sectionOrdinal(current.sectionNumber)) {
+          current.hashHeadings.push(...hashLines.slice(0, j));
+          displayLines.splice(0, j);
+          hashLines.splice(0, j);
+          sectionNumber = n;
+        }
+        break;
+      }
+    }
+
+    if (!sectionNumber) {
+      if (current) {
+        // The portal splits long sections into several rows, each with its own marginal note
+        // ("(2) …", "Provided that …", "Second Exception …"). They belong to the section above.
+        if (hashHeading) current.hashHeadings.push(hashHeading);
+        current.displayLines.push(...displayLines);
+        current.hashLines.push(...hashLines);
+        current.markers.push(...markers);
+      } else if (!PREAMBLE_HEADING.test(hashHeading)) {
+        warnings.push(`section block #${i}: no section number`);
+      }
       return;
     }
-    if (seenKeys.has(key)) {
-      warnings.push(`duplicate section key ${key}; kept the first occurrence`);
-      return;
-    }
-    seenKeys.add(key);
 
-    const footnotes: ParsedFootnote[] = [];
-    for (const n of [...markers].sort((a, b) => +a - +b)) {
-      const text = footnoteTexts.get(n);
-      if (text) footnotes.push(parseFootnoteAction(text));
-      else warnings.push(`section ${key}: footnote ${n} referenced but not found`);
+    current = null; // set again below; never attach continuation rows to the wrong section
+    for (const number of rangeNumbers ?? [sectionNumber]) {
+      const key = normalizeSectionKey(number);
+      if (!key || seenKeys.has(key)) {
+        warnings.push(key ? `duplicate section key ${key}; kept the first occurrence` : `section block #${i}: bad section number`);
+        continue;
+      }
+      seenKeys.add(key);
+      // Each section of a range gets its own copy of the shared "[Repealed …]" text.
+      current = {
+        sectionNumber: number,
+        key,
+        chapter,
+        heading,
+        hashHeadings: [hashHeading],
+        displayLines: [...displayLines],
+        hashLines: [...hashLines],
+        markers: [...markers],
+      };
+      drafts.push(current);
     }
-
-    sections.push({
-      sectionNumber,
-      normalizedSectionKey: key,
-      chapterReference: chapter,
-      marginalHeading: heading,
-      contentBody: displayLines.join('\n'),
-      parts: splitParts(hashLines),
-      footnotes,
-      contentHash: hashSectionContent(hashHeading, hashLines.join('\n')),
-      footnotesHash: hashFootnotes(footnotes.map((f) => f.text)),
-    });
   });
 
+  const sections = drafts.map((d) => finishSection(d, footnoteTexts, warnings));
   if (!sections.length) warnings.push('no sections parsed');
 
   const sample = `${title} ${sections[0]?.contentBody.slice(0, 500) ?? ''}`;
@@ -161,10 +226,66 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
     actNumber: actNumber ? normalizeForDisplay(actNumber) : null,
     language: bn > en ? 'BN' : 'EN',
     enactedDate: dateText ? parseLegalDate(dateText) : null,
-    isRepealed: new RegExp(cfg.repealedPattern, 'iu').test(`${title} ${preamble}`),
+    // The portal marks every section block of a repealed Act (`repealed` / `bn-repealed`); the title
+    // usually doesn't say so. The text pattern is kept as a fallback.
+    isRepealed:
+      (sectionBlocks > 0 && repealedBlocks === sectionBlocks) ||
+      new RegExp(cfg.repealedPattern, 'iu').test(`${title} ${preamble}`),
     sections,
     warnings,
   };
+}
+
+/** A section while its rows are being collected. */
+interface SectionDraft {
+  sectionNumber: string;
+  key: string;
+  chapter: string | null;
+  heading: string | null;
+  /** Marginal notes of every row, without footnote markers; all of them feed the content hash. */
+  hashHeadings: string[];
+  displayLines: string[];
+  hashLines: string[];
+  markers: string[];
+}
+
+function finishSection(d: SectionDraft, footnoteTexts: Map<string, string>, warnings: string[]): ParsedSection {
+  const footnotes: ParsedFootnote[] = [];
+  for (const n of [...new Set(d.markers)].sort((a, b) => +a - +b)) {
+    const text = footnoteTexts.get(n);
+    if (text) footnotes.push(parseFootnoteAction(text));
+    else warnings.push(`section ${d.key}: footnote ${n} referenced but not found`);
+  }
+  return {
+    sectionNumber: d.sectionNumber,
+    normalizedSectionKey: d.key,
+    chapterReference: d.chapter,
+    marginalHeading: d.heading,
+    contentBody: d.displayLines.join('\n'),
+    parts: splitParts(d.hashLines),
+    footnotes,
+    // For a single-row section this is hash(heading, body), as before continuation rows existed.
+    contentHash: hashSectionContent(d.hashHeadings.join('\n'), d.hashLines.join('\n')),
+    footnotesHash: hashFootnotes(footnotes.map((f) => f.text)),
+  };
+}
+
+/** "23 and 24" → [23, 24]; "100-103" → [100 … 103]. Null for a range that doesn't make sense. */
+function expandRange(m: RegExpExecArray): string[] | null {
+  const from = Number(m[1]);
+  const to = Number(m[3]);
+  if (!(to > from) || to - from > MAX_RANGE) return null;
+  if (m[2] === 'and') return [String(from), String(to)];
+  return Array.from({ length: to - from + 1 }, (_, k) => String(from + k));
+}
+
+function matchedNumber(m: RegExpExecArray | null): string | null {
+  return m?.[1]?.replace(/\s+/g, '') || null;
+}
+
+/** Numeric part of a section number ("120B" → 120, "৫৬১ক" → 561). */
+function sectionOrdinal(sectionNumber: string): number {
+  return Number.parseInt(toAsciiDigits(sectionNumber), 10) || 0;
 }
 
 /** Footnote number → footnote text (number removed). */
@@ -193,16 +314,18 @@ function withoutMarkers(el: Cheerio<AnyNode>, markerSel: string): Cheerio<AnyNod
   return copy;
 }
 
-/** One line per <p>/<li>/<br>-separated paragraph, whitespace-collapsed, empties dropped. */
-function paragraphs($: cheerio.CheerioAPI, el: Cheerio<AnyNode>): string[] {
+/**
+ * One line per paragraph, whitespace-collapsed, empties dropped. Paragraphs are separated by
+ * `lineBreakSel` elements (bdlaws uses <div class="clbr"> / <div class="na"> in English Acts) and by
+ * block elements (<p> in Bangla Acts). Text outside any block element is kept.
+ */
+function paragraphs($: cheerio.CheerioAPI, el: Cheerio<AnyNode>, lineBreakSel: string): string[] {
   const copy = el.clone();
-  copy.find('br').replaceWith('\n');
-  const blocks = copy.find('p, li');
-  const raw = blocks.length ? blocks.toArray().map((b) => $(b).text()) : [copy.text()];
-  return raw
-    .flatMap((t) => t.split('\n'))
-    .map(normalizeForDisplay)
-    .filter(Boolean);
+  copy.find(lineBreakSel).replaceWith('\n');
+  copy.find('p, li, div, tr').each((_, b) => {
+    $(b).before('\n').after('\n');
+  });
+  return copy.text().split('\n').map(normalizeForDisplay).filter(Boolean);
 }
 
 function splitParts(lines: string[]): SectionPart[] {

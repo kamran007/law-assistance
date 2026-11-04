@@ -7,7 +7,30 @@ import type { SourceConfig } from './source-config';
 export type FetchLike = (
   url: string,
   init: { headers: Record<string, string>; signal: AbortSignal },
-) => Promise<{ status: number; headers: { get(name: string): string | null }; text(): Promise<string> }>;
+) => Promise<{ status: number; headers: { get(name: string): string | null }; arrayBuffer(): Promise<ArrayBuffer> }>;
+
+/**
+ * Decodes a response body. fetch's `text()` always assumes UTF-8, but bdlaws serves its index and
+ * Act detail pages as `charset=UTF-16` (big-endian, with a BOM) and its print views as UTF-8.
+ * Order: byte-order mark, then the Content-Type charset, then UTF-8. A UTF-16 body without a BOM is
+ * read as big-endian (RFC 2781). Unknown charsets fall back to UTF-8 rather than failing the crawl.
+ */
+export function decodeBody(bytes: Uint8Array, contentType: string | null): string {
+  let encoding = 'utf-8';
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) encoding = 'utf-16be';
+  else if (bytes[0] === 0xff && bytes[1] === 0xfe) encoding = 'utf-16le';
+  else if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) encoding = 'utf-8';
+  else {
+    const charset = /charset\s*=\s*"?([\w-]+)/i.exec(contentType ?? '')?.[1]?.toLowerCase();
+    if (charset === 'utf-16') encoding = 'utf-16be';
+    else if (charset) encoding = charset;
+  }
+  try {
+    return new TextDecoder(encoding).decode(bytes); // strips a matching BOM
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+}
 
 export interface Validators {
   etag?: string;
@@ -101,7 +124,7 @@ export class PoliteHttpClient {
     const res = await this.request(url, headers);
     const fetchedAt = this.now();
     if (res.status === 304) return { kind: 'not-modified', url, fetchedAt };
-    const body = await res.text();
+    const body = decodeBody(new Uint8Array(await res.arrayBuffer()), res.headers.get('content-type'));
     const validators: Validators = {};
     const etag = res.headers.get('etag');
     const lastModified = res.headers.get('last-modified');
@@ -145,7 +168,7 @@ export class PoliteHttpClient {
     let body = '';
     try {
       const res = await this.request(robotsUrl, { 'user-agent': this.cfg.userAgent });
-      body = await res.text();
+      body = decodeBody(new Uint8Array(await res.arrayBuffer()), res.headers.get('content-type'));
     } catch (err) {
       // A missing robots.txt (4xx) means no restrictions. Anything else (unreachable) is fatal for
       // this run: we do not crawl without knowing the rules. The next run tries again.

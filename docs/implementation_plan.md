@@ -81,21 +81,21 @@ These items block engineering milestones. Start them in **Week 1**.
 
 ### Platform & DevOps
 - [~] **OPS-01** Create the pnpm monorepo layout (`apps/api`, `apps/worker`, `apps/web`, `packages/*`, `mobile/`, `infra/`, `evals/`) per TRD §3.2 · *Done when:* `pnpm install && pnpm build` passes
-- [~] **OPS-02** `docker-compose` for local dev: mysql:8.4, redis, qdrant, minio, TEI (CPU, bge-m3 + reranker) · *Done when:* `docker compose up` brings up every service healthy
+- [~] **OPS-02** `docker-compose` for local dev: mysql:8.4, redis, qdrant, SeaweedFS (S3), TEI (CPU, bge-m3 + reranker) · *Done when:* `docker compose up` brings up every service healthy
 - [x] **OPS-03** GitHub Actions CI: lint, `tsc --noEmit`, Vitest, Testcontainers integration, Gitleaks, Semgrep, Trivy · *Done when:* a PR shows a green pipeline in under 10 min
 - [ ] **OPS-04** Terraform base: VPC, private subnets, RDS MySQL 8.4 (dev), ElastiCache, S3 (SSE-KMS), ECR, Secrets Manager, ECS cluster (dev) · *Depends:* OPS-01
 - [x] **OPS-05** `packages/config`: Zod-validated env (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, DB, Redis, Qdrant, Google creds, JWT keys). The app refuses to boot if config is invalid
 
 ### Database
 - [x] **BE-01** Drizzle schema for all tables in TRD §4.2: users, statutes, statute_sections (+ `current_key` generated column, FULLTEXT ngram), section_chunks, crpc_schedule_metadata, case_files, case_artifacts, artifact_revisions, conversations, messages, otp_challenges, refresh_tokens, credential_reviews, scrape_runs/events, outbox_events, audit_log · *Done when:* migrations apply cleanly on an empty DB
-- [~] **BE-02** DB users & grants (`app_api`, `app_worker`, `app_scraper`, `app_migrate`) per TRD §4.3 · Citizen-case-conversation trigger (TRD §4.2)
+- [x] **BE-02** DB users & grants (`app_api`, `app_worker`, `app_scraper`, `app_migrate`) per TRD §4.3 · Citizen-case-conversation trigger (TRD §4.2)
 - [x] **BE-02a** `packages/db/scoped.ts` scoped repository + ESLint `no-restricted-imports` ban on raw access to tenant tables · *Done when:* lint fails on a deliberate violation
 
 ### Corpus
-- [~] **DATA-01** Spike: map `bdlaws.minlaw.gov.bd` URL patterns (index, Act detail, print view) and HTML structure for 10 representative Acts (English pre-1987, Bangla post-1987, heavily amended e.g. CrPC) · *Output:* `scraper/README.md` with selectors and URL config
+- [x] **DATA-01** Spike: map `bdlaws.minlaw.gov.bd` URL patterns (index, Act detail, print view) and HTML structure for 10 representative Acts (English pre-1987, Bangla post-1987, heavily amended e.g. CrPC) · *Output:* `scraper/README.md` with selectors and URL config
 - [x] **DATA-02** `packages/legal-text`: NFC + Bangla variant normalizer, Bangla↔ASCII digits, section-key normalizer (`৫৬১ক` → `561A`), SHA-256 hashing · *Done when:* ≥ 95% unit-test coverage
-- [~] **DATA-03** Crawler worker: undici + 1 req/s limiter, robots.txt, conditional GET, backoff, raw HTML snapshots to S3 (TRD §6.1)
-- [~] **DATA-04** Cheerio parser: Act → Chapter → Section → Sub-section → Footnotes; footnote action parser (substituted/inserted/omitted, amending Act, date) (TRD §6.2)
+- [x] **DATA-03** Crawler worker: undici + 1 req/s limiter, robots.txt, conditional GET, backoff, raw HTML snapshots to S3 (TRD §6.1)
+- [x] **DATA-04** Cheerio parser: Act → Chapter → Section → Sub-section → Footnotes; footnote action parser (substituted/inserted/omitted, amending Act, date) (TRD §6.2)
 - [x] **DATA-05** Versioning transaction + outbox writes + 20% change safety valve (TRD §6.3) · *Done when:* the integration test "amend → archive → new current" passes, including concurrent workers
 
 **Sprint 1 demo:** scrape 10 Acts → re-run → no new versions → edit one snapshot by hand → re-run → v2 created, v1 archived with `valid_to`.

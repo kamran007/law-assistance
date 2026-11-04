@@ -4,9 +4,8 @@ import { z } from 'zod';
 /**
  * bdlaws.minlaw.gov.bd URL patterns and HTML selectors (TRD §6.1: "keep them in config, not in code").
  *
- * STATUS: the defaults below follow the portal's known layout but were NOT verified against live
- * pages. The DATA-01 spike on 2026-11-03 could not reach the site (requests timed out or reset).
- * Confirm them against the 10 spike Acts and update `scraper/README.md` + this file together.
+ * STATUS: verified against live pages on 2026-11-04 (DATA-01 spike, 9 Acts; see `README.md` in this
+ * folder). Update the README and this file together when the portal changes.
  * A JSON file passed via SCRAPER_SOURCE_CONFIG can override any field without a code change.
  */
 export const sourceConfigSchema = z.object({
@@ -39,6 +38,10 @@ export const sourceConfigSchema = z.object({
     footnoteMarker: z.string(),
     /** Footnote list entries at the end of the Act. */
     footnote: z.string(),
+    /** Elements inside a section body that separate paragraphs (in addition to <p>/<li>). */
+    lineBreak: z.string(),
+    /** Matches a section block that the portal marks as repealed. */
+    repealedSection: z.string(),
   }),
   /** Text in the title/preamble that marks the Act as repealed. */
   repealedPattern: z.string(),
@@ -50,27 +53,31 @@ export const DEFAULT_SOURCE_CONFIG: SourceConfig = {
   baseUrl: 'http://bdlaws.minlaw.gov.bd',
   userAgent: 'BD-LawAssist-Crawler/0.1',
   minIntervalMs: 1000, // 1 request/second globally (TRD §6.1)
-  requestTimeoutMs: 60_000,
+  // Print views of large Acts are slow: CrPC took 41 s, the Penal Code 22 s (2026-11-04).
+  requestTimeoutMs: 120_000,
   maxRetries: 4,
   urls: {
-    indexPaths: [
-      '/laws-of-bangladesh.html',
-      '/laws-of-bangladesh-alphabetical-index.html',
-      '/laws-of-bangladesh-chronological-index.html',
-    ],
+    // The chronological index (~2.6 MB) links every Act as /act-{id}.html. The main index only
+    // links volumes, and the alphabetical index is ~57 MB, so neither is used.
+    indexPaths: ['/laws-of-bangladesh-chronological-index.html'],
     actPrint: '/act-print-{id}.html',
     actDetail: '/act-{id}.html',
     actLinkPattern: String.raw`act-(?:details-|print-)?(\d+)\.html`,
   },
   selectors: {
-    title: '.act-title, h3.text-center',
-    preamble: '.act-no, .act-date, p.text-center',
-    section: '.lineremove, .lineremoves',
+    title: '.bg-act-section h3',
+    preamble: '.bg-act-section h4, .publish-date',
+    // `.lineremove` (singular) is the title block, not a section.
+    section: '.lineremoves',
     sectionHeading: '.txt-head',
     sectionBody: '.txt-details',
-    chapter: '.act-chapter-name, .act-chapter-group > p:first-child',
+    // "Chapter I" + "INTRODUCTION"; the group sits inside the row of the chapter's first section.
+    chapter: '.act-chapter-group',
+    // Markers are <span class="footnote" title="…"><sup>n</sup></span>; the number is the <sup> text.
     footnoteMarker: 'sup',
-    footnote: '.footnote li, .footnote p',
+    footnote: '.footnoteListAll li.footnoteList',
+    lineBreak: '.clbr, .na, br',
+    repealedSection: '.repealed, .bn-repealed',
   },
   repealedPattern: String.raw`\[\s*repealed\s*\]|\brepealed\b by|রহিত`,
 };

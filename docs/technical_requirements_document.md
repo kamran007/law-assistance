@@ -827,7 +827,7 @@ All processors are listed in the privacy notice (App Flow §14).
 ### 13.1 Environments
 | Env | Purpose | Data |
 | :--- | :--- | :--- |
-| `local` | docker-compose: api, worker, mysql:8.4, redis, qdrant, minio, TEI (CPU) | Seed corpus (10 Acts) |
+| `local` | docker-compose: api, worker, mysql:8.4, redis, qdrant, SeaweedFS (S3 API; MinIO no longer publishes images), TEI (CPU) | Seed corpus (10 Acts) |
 | `staging` | Mirrors production at small scale | Full corpus, synthetic user data only |
 | `production` | Pilot | Real data |
 
