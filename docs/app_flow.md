@@ -60,7 +60,7 @@ Persistent **left sidebar** + **main canvas** + collapsible **right verifier pan
 | Assistant | `[Assistant Chat]`: general conversations not linked to any case | All roles |
 | Case Files | `[Case File List]` → `[Case Workspace]`. For Lawyers and Judges, each case has its own conversation (§5.2). | All roles (Citizen: scans only, with no case conversation and no drafts) |
 | Scan / Upload | `[Upload Document]` modal | All roles |
-| Law Library | `[Statute Browser]` | All roles |
+| Law Library | `[Statute Browser]` with a **Statutes / Case Law** switch (§7.2, §7.3) | All roles |
 | GD Template | `[GD Voice Form]` | `CITIZEN` |
 | Admin | `[Admin Console]` | `ADMIN` only — ⚠ Assumption |
 | Profile & Settings | `[Settings]` | All roles |
@@ -79,7 +79,8 @@ The **right panel** (`[Law Verifier]`) opens whenever a citation is clicked, any
          A floating push-to-talk mic button sits on the Home (Chat) tab.
 ```
 
-- The law verifier opens as a **bottom sheet** (drag up to read the full screen) instead of a side panel.
+- The law verifier opens as a **bottom sheet** (drag up to read the full screen) instead of a side panel. The same sheet shows a judgment when a judgment citation is tapped.
+- The Library tab has the same **Statutes / Case Law** switch as the web.
 - Live dictation opens full screen from inside a Case File (Lawyer/Judge).
 
 ---
@@ -178,6 +179,8 @@ The default landing screen for every role.
 [Streaming Answer]  -- first token in under 1.5 s
     - Text appears token by token
     - Citation chips render inline: [Section 497, Code of Criminal Procedure, 1898]
+    - Judgment chips (different style, with an AD/HCD badge):
+      [Md. Humayun Kabir Vs. The State, 20 SCOB [2025] AD, para 74]
     |
     v
 <Verified provision found?>
@@ -191,7 +194,11 @@ The default landing screen for every role.
     | (Tap a citation chip)
     v
 [Law Verifier panel / bottom sheet]  (§7)
+    or, for a judgment chip,
+[Judgment Viewer, scrolled to the cited paragraph]  (§7.3)
 ```
+
+Judgments only add to a statute-backed answer. If no statute provision is found, the "No verified statutory provision" message is shown even when related judgments exist.
 
 ### 5.1 How the answer differs by role
 
@@ -200,6 +207,8 @@ The default landing screen for every role.
 | `CITIZEN` | Plain, empathetic Bangla/English. Rights and practical next steps. No jargon. |
 | `LAWYER` | Analytical and strategic. Defense angles, prosecution burden, cross-references (e.g. linked Evidence Act sections), limitation checks. |
 | `JUDGE` | Neutral bench-memo format. Statutory compliance, jurisdiction, admissibility, sentencing limits, compoundability. |
+
+All roles may see judgment citations. Citizens get a one-line plain explanation of what the court held. Lawyers and Judges see the division and the cited paragraph number, and a note when the judgment was decided on an earlier version of the section.
 
 ### 5.2 Case Conversations (Lawyer & Judge): one case, one conversation
 
@@ -304,8 +313,14 @@ Opened from: a citation chip in an answer · a section row in an FIR analysis ·
  |-------------------------------------------------------------|
  | CrPC Schedule II: Cognizable · Non-bailable ·               |
  | Non-compoundable · Max: 7 yrs + fine · Magistrate 1st Class |
+ |-------------------------------------------------------------|
+ | Judgments on this section (3)                    [See all]  |
+ |  AD  Md. Humayun Kabir Vs. The State · 20 SCOB [2025] AD    |
+ |  HCD … · ⚠ Decided before this section was amended          |
  +-------------------------------------------------------------+
 ```
+
+**API:** `GET /api/v1/statutes/{act_id}/sections/{sec}/judgments` for the judgments block. It is hidden when no judgment is linked.
 
 - **Version history** lists every version with `valid_from` / `valid_to` dates. Tapping one shows the old text with a diff highlight against the current version. Lawyer & Judge only (FR-A4). Citizens see only the current version.
 - **Repealed** statutes show a red `REPEALED` badge, and AI answers never cite them as current law.
@@ -325,6 +340,39 @@ Opened from: a citation chip in an answer · a section row in an FIR analysis ·
     v
 [Section] -> opens the same Law Verifier view (§7.1)
 ```
+
+### 7.3 Case Law (Supreme Court judgments, Module D)
+
+**API:** `GET /api/v1/judgments?q=&division=&year=&act_id=&sec=` · `GET /api/v1/judgments/{judgment_id}`
+
+```text
+[Law Library] -> (Case Law)
+    | (Search by keyword, party, judge, or Act + section — BN or EN)
+    v
+[Judgment List]  (filter: Appellate Division / High Court Division, year)
+    - each row: parties · citation · division badge · authoring judge · key words
+    |
+    v
+[Judgment Viewer]
+ +-------------------------------------------------------------+
+ | Md. Humayun Kabir Vs. The State          Appellate Division |
+ | 20 SCOB [2025] AD · Criminal Appeal No. … · Decided …       |
+ | Judge: Syed Md. Ziaul Karim, J                              |
+ |-------------------------------------------------------------|
+ | Key words · Summary (as published in SCOB)                  |
+ | Key ratio: para 74   [Jump to para]                         |
+ |-------------------------------------------------------------|
+ | Full text with numbered paragraphs                          |
+ |-------------------------------------------------------------|
+ | Sections referred to: Penal Code s.302 → opens verifier     |
+ | [Copy citation]   [Open original PDF]                       |
+ +-------------------------------------------------------------+
+```
+
+- Opened from: a judgment chip in an answer · the judgments block in the verifier (§7.1) · the Case Law search.
+- Sections referred to in the judgment link to the Law Verifier. References that couldn't be matched to a stored section are shown as plain text, not as links.
+- "Open original PDF" opens the court's PDF from storage, so the user can check the source.
+- Judgments whose text couldn't be extracted yet (`NEEDS_REVIEW`) are not listed.
 
 ---
 
@@ -618,10 +666,28 @@ User-visible effects:
     "Section 420 was amended on DD-MM-YYYY. Your case uses the version valid on the offense date."  ⚠ Assumption
 ```
 
+### 15.1a Judgment sync (Module D)
+
+```text
+{Weekly crawler -> SCOB index -> AD & HCD lists per issue -> judgment PDFs}
+    |
+<New or changed PDF?> --No--> skip
+    |
+   Yes
+    v
+{Extract text & metadata -> link to statute sections -> embed}
+    |
+    v
+User-visible effects:
+  - New judgments appear in Case Law search and in the verifier's "Judgments on this section" block
+  - Judgments with missing metadata wait in the admin review queue (§15.2) and are hidden until fixed
+```
+
 ### 15.2 Admin Console (minimal) ⚠ Assumption
 The SRS defines the `ADMIN` role but no admin screens. Proposed MVP scope:
 - **Credential verification queue:** approve or reject Lawyer/Judge Bar Council or Judicial IDs.
-- **Sync dashboard:** last sync time per statute, failed crawls, number of new amendment versions.
+- **Sync dashboard:** last sync time per statute, failed crawls, number of new amendment versions. SCOB runs: issues found, judgments new/changed/failed.
+- **Judgment review queue:** judgments whose decision date, case number or text couldn't be extracted; the admin fills in the missing fields (logged).
 - **Schedule II table editor:** correct rows in `CrPC_Schedule_Metadata` (every change logged).
 
 ---
@@ -634,6 +700,9 @@ The SRS defines the `ADMIN` role but no admin screens. Proposed MVP scope:
 | Per-case conversation (one per Case File) | — | ✅ | ✅ | — |
 | Law Verifier — current version | ✅ | ✅ | ✅ | ✅ |
 | Law Verifier — version history / point-in-time | — | ✅ | ✅ | ✅ |
+| Case Law search & Judgment Viewer | ✅ | ✅ | ✅ | ✅ |
+| Judgment citations in answers | ✅ (plain explanation) | ✅ (division + paragraph) | ✅ (division + paragraph) | — |
+| Judgment review queue | — | — | — | ✅ |
 | Case Files | ✅ (scans only) | ✅ | ✅ | — |
 | FIR / document scan | ✅ (simple table) | ✅ (ingredient audit) | ✅ (charge matrix) | — |
 | Live dictation drafts | — | ✅ | ✅ | — |
@@ -651,6 +720,8 @@ The SRS defines the `ADMIN` role but no admin screens. Proposed MVP scope:
 | Assistant stream interrupted | Partial answer kept, with "Answer interrupted — Retry". |
 | No verified provision | Fixed message (NFR 1). The assistant never answers without a citation. |
 | Citation points to a missing section | Chip shows a "Not verified" state. The answer is flagged for review and logged. |
+| No judgments for a search or section | "No reported Supreme Court judgment found in the Online Bulletin." The judgments block in the verifier is hidden. |
+| Original judgment PDF can't be loaded | The extracted text stays readable; "Original PDF unavailable right now — Retry". |
 | Scan unreadable | "Couldn't read this document" + tips (lighting, flat surface) + Rescan. |
 | Microphone / camera denied | Explanation + button to open OS settings. |
 | Session expired | Silent refresh. If it fails, go to login and keep local drafts. |
@@ -672,3 +743,4 @@ The SRS defines the `ADMIN` role but no admin screens. Proposed MVP scope:
 | 7 | No dictation conflict or offline rules | Last-write-wins with a recoverable copy; offline queue (§13) |
 | 8 | No admin screens despite the `ADMIN` role | Minimal Admin Console (§15.2) |
 | 9 | No statute search / list endpoint for the Law Library | Add `GET /api/v1/statutes?q=` and `GET /api/v1/statutes/{act_id}` |
+| 10 | SRS Module D lists judgments per search, but no endpoint for "judgments on this section" in the verifier | Add `GET /api/v1/statutes/{act_id}/sections/{sec}/judgments` (§7.1) |

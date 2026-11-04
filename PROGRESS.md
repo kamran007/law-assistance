@@ -4,7 +4,7 @@ Live status of the build. Task IDs come from [docs/implementation_plan.md](docs/
 Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ not started · ⛔ blocked
 
 **Current sprint:** S2 (Weeks 3–4) — Corpus Live, Auth & Retrieval Core. S1 code is merged; S1 leftovers: DATA-01 live check, BE-02 grants test, OPS-02
-**Last updated:** 2026-11-03
+**Last updated:** 2026-11-04
 
 ---
 
@@ -35,6 +35,22 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | DATA-07 | Qdrant collection setup + `reindex --all` | 🟡 | `collection.ts`: alias `section_chunks` → physical `section_chunks_<ts>`, 1024-dim cosine, HNSW m=16/ef_construct=128, payload indexes (is_current, valid_from/to datetime, statute_id, section_id, act_status). `reindexAll` rebuilds all versions from MySQL, catches up on sections changed during the rebuild, swaps the alias, drops the old collection. CLI: `--setup-index`, `--reindex-all`, `--drain-outbox`. Covered by `index.int.test.ts` (not run yet) |
 | DATA-08 | Ingest top 50 Acts | ⛔ | Needs DATA-01 (portal reachable) and TEI running (`docker compose --profile ml`) |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
+
+## Case law (Module D) — planned for S3–S4
+
+Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court Online Bulletin, issues 1 (2015) to 20 (2025), Appellate and High Court Divisions.
+
+| ID | Task | Status | Evidence / Notes |
+| :--- | :--- | :---: | :--- |
+| JUD-01 | SCOB URL/HTML + PDF spike | ⬜ | Page structure checked once by hand on 2026-11-04 (index, AD list for issue 20, PDF href pattern); written into SRS §4.4. Fixtures, both list templates and PDF samples still to do |
+| JUD-02 | Judgment tables + grants | ⬜ | |
+| JUD-03 | SCOB crawler + list parser | ⬜ | Production crawl waits for PRE-11 (site terms) |
+| JUD-04 | PDF text + metadata pipeline | ⬜ | OCR fallback needs BE-20; Bijoy needs DATA-11 |
+| JUD-05 | Statute linking | ⬜ | Full version needs DATA-12 |
+| JUD-06 | Judgment chunks → Qdrant + backfill | ⬜ | |
+| JUD-07 | Judgments API + case-law RAG arm | ⬜ | S4 |
+| WEB-12 / MOB-13 | Case-law UI (web / mobile) | ⬜ | S4 / S6 |
+| EVAL-09 / EVAL-10 | Case-law and judgment-metadata evals | ⬜ | EVAL-09 needs PRE-12 (LEGAL question set) |
 
 ## Verification snapshot (2026-11-03)
 
@@ -82,6 +98,9 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | 2026-11-03 | Outbox consumer handles only index events. `NOTIFY_AFFECTED_CASES` stays unprocessed for the future notification consumer | One `processed_at` column per event; separate consumers by event type |
 | 2026-11-03 | `msgpackr-extract` native build disabled (`allowBuilds: false`) | Optional BullMQ speed-up; pure-JS fallback is fine |
 | 2026-11-03 | Bangla sub-section letters map ক→A, খ→B, … in consonant order | Matches inserted-section convention (৩২৬ক = 326A). **LEGAL to confirm beyond ঙ** |
+| 2026-11-04 | Case law in MVP scope: SCOB reported judgments (AD + HCD) only (D12). New Module D, tasks `JUD-01..07` (DATA-* IDs were all taken) | Statutes alone don't show how courts read them; SCOB is the Supreme Court's own free, public law report. Translations, unreported judgments and paid reports stay post-MVP |
+| 2026-11-04 | Judgments get their own tables and Qdrant collection (`judgment_chunks`), not mixed into `section_chunks`; no point-in-time filter, instead a "decided on an earlier version" flag | Judgments aren't versioned law; separate payloads and a separate retrieval arm keep the statute path and its evals unchanged |
+| 2026-11-04 | Judgments add to an answer but never replace the statute citation or bypass the NO_PROVISION gate | Keeps SRS NFR 1 (every statutory claim cited to `statute_sections`) intact |
 
 ## Next steps (in order)
 
@@ -90,3 +109,4 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 2. DATA-01: from a network that reaches bdlaws, save the 10 spike Acts as fixtures, then correct selectors and URL patterns (checklist in `apps/worker/src/scrape/README.md`).
 3. Run the Sprint 1 demo for real: `docker compose up -d` → `pnpm db:migrate` → `pnpm --filter @lawassist/worker scrape -- --acts <10 ids>` twice → edit a snapshot → `--act <id> --snapshot <key>`.
 4. Then Sprint 2: DATA-06 chunker + outbox worker → TEI → Qdrant.
+5. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.

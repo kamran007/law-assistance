@@ -6,7 +6,7 @@
 | **Document Scope** | How the MVP will be built: technology stack, service design, data model, API contracts, AI pipelines, security, infrastructure, testing |
 | **Inputs** | `bd_lawassist_mvp_software_requirements_specification.md` (SRS) · `app_flow.md` (App Flow) |
 | **Audience** | Backend, web, mobile, ML and DevOps engineers |
-| **Status** | Draft v1.1 — 2026-11-03 (backend: Node.js · database: MySQL · AI: Anthropic via Vercel AI SDK) |
+| **Status** | Draft v1.2 — 2026-11-04 (backend: Node.js · database: MySQL · AI: Anthropic via Vercel AI SDK). v1.2 adds Module D: Supreme Court judgments (§6A) |
 
 > **Conventions.** `MUST` = required for MVP launch. `SHOULD` = strongly recommended, may slip to post-pilot. Items marked **🔶 Decision** are technology choices made in this document that the team may revisit. Section 17 lists them all.
 
@@ -16,7 +16,7 @@
 
 | # | Goal | Derived From | Measurable Target |
 | :--- | :--- | :--- | :--- |
-| G1 | Never present an uncited or unverifiable statutory claim | SRS NFR 1 | 100% of citation chips resolve to a `statute_sections` row; 0 invalid citations reach the client |
+| G1 | Never present an uncited or unverifiable statutory claim or case-law reference | SRS NFR 1 | 100% of citation chips resolve to a `statute_sections` or `judgments` row; 0 invalid citations reach the client |
 | G2 | Bail / cognizance / compoundability status is never AI-generated | FR-B3 | Shown only from `crpc_schedule_metadata`; covered by unit tests |
 | G3 | Law text is version-correct for the requested date | FR-A3, FR-A4 | Point-in-time query returns the version whose `[valid_from, valid_to)` contains the date |
 | G4 | Low latency | SRS NFR 4 | Q&A first token < 1.5 s (p90) · dictation word < 800 ms (p90) · 1-page FIR breakdown < 6 s (p90) |
@@ -28,7 +28,7 @@
 - 12-week MVP and a small team, so prefer **managed services** and **TypeScript everywhere**: backend, workers, web. Mobile is the exception (§15.2).
 - **Backend language: Node.js. Primary database: MySQL.** These are fixed project decisions.
 - **AI provider:** Anthropic models accessed through the **Vercel AI SDK `@ai-sdk/anthropic` provider pointed at a custom base URL** (an API relay), as set in the project's provider config (§7.6).
-- The source corpus (`bdlaws.minlaw.gov.bd`) is a public government website with no API. Scraping MUST be polite and resilient to layout changes.
+- The source corpora (`bdlaws.minlaw.gov.bd` for statutes, the Supreme Court Online Bulletin on `supremecourt.gov.bd` for judgments) are public government websites with no API. Scraping MUST be polite and resilient to layout changes.
 - Users upload sensitive criminal-case material. Every third-party processor (LLM relay, LLM provider, OCR, STT) MUST be contractually barred from training on the data or retaining it beyond what processing needs (§12.4).
 
 ---
@@ -78,8 +78,9 @@
                                             v
 +-------------------------------------------------------------------------------+
 |  api  (Node.js 22 + Fastify, stateless, horizontally scaled)                   |
-|  modules: auth · users · conversations · assistant(RAG) · statutes · cases ·   |
-|           artifacts · scan · voice · dictation(WS) · export · admin            |
+|  modules: auth · users · conversations · assistant(RAG) · statutes ·          |
+|           judgments · cases · artifacts · scan · voice · dictation(WS) ·      |
+|           export · admin                                                      |
 +-----+-------------+--------------+--------------+---------------+--------------+
       |             |              |              |               |
       v             v              v              v               v
@@ -98,7 +99,8 @@
        |                        |                         |
        v                        v                         v
  bdlaws.minlaw.gov.bd   Google Vision / STT     AI relay (custom baseURL)
-                                                 → Anthropic Claude
+ supremecourt.gov.bd                             → Anthropic Claude
+ (SCOB judgments)
 ```
 
 ### 3.2 Repository Layout (pnpm monorepo)
@@ -111,8 +113,8 @@ apps/
       core/                  # config (zod-validated env), auth (JWT), db, scoped repos, logging
       modules/
         auth/  users/  conversations/  assistant/  retrieval/  statutes/
-        schedule/  cases/  artifacts/  scan/  voice/  export/  admin/
-  worker/                    # BullMQ processors: scrape, diff, embed, ocr, analyze, export, outbox
+        judgments/  schedule/  cases/  artifacts/  scan/  voice/  export/  admin/
+  worker/                    # BullMQ processors: scrape (bdlaws), scob (judgments), diff, embed, ocr, analyze, export, outbox
   web/                       # Next.js
 packages/
   db/                        # Drizzle schema, migrations, scoped repository helpers
@@ -131,7 +133,7 @@ Each external engine sits behind a `packages/providers` interface, so OCR, STT, 
 
 ## 4. Data Model (MySQL 8.4)
 
-The SRS defines six entities. This TRD adds the tables the App Flow needs (conversations, auth, revisions, jobs).
+The SRS defines eight entities (six core + two for case law). This TRD adds the tables the App Flow needs (conversations, auth, revisions, jobs, judgment chunks).
 
 **MySQL conventions**
 - **IDs:** UUID v7 stored as `BINARY(16)` (time-ordered, so it suits the InnoDB clustered index). The API exposes them as strings.
@@ -152,6 +154,10 @@ users 1---* case_files 1---* case_artifacts 1---* artifact_revisions
 statutes 1---* statute_sections 1---* section_chunks  ──(mirrored)──> Qdrant collection "section_chunks"
 statutes 1---* crpc_schedule_metadata
 outbox_events (MySQL → Qdrant sync)        scrape_runs 1---* scrape_events
+
+judgments 1---* judgment_chunks  ──(mirrored)──> Qdrant collection "judgment_chunks"
+judgments 1---* judgment_statute_refs *---0..1 statutes
+judgments 1---* judgment_revisions
 ```
 
 ### 4.2 Changes & Additions to SRS Entities
@@ -244,6 +250,27 @@ Rules:
 - `outbox_events`: `id`, `aggregate`, `aggregate_id`, `event_type`, `payload JSON`, `created_at`, `processed_at`
 - `audit_log`: append-only; the application DB user has `INSERT` but not `UPDATE`/`DELETE` on it
 
+**Case-law tables** (new — SRS 5.7, 5.8, Module D). Public reference data, **not** tenant tables; no `owner_user_id`.
+
+**`judgments`** (SRS 5.7) — as in the SRS, with these MySQL details:
+| Field | Change / Type | Notes |
+| :--- | :--- | :--- |
+| `judgment_id` | `BINARY(16)` PK (UUID v7) | |
+| `issue_number`, `division`, `serial_number` | `SMALLINT`, `ENUM('AD','HCD')`, `SMALLINT` | **UNIQUE** `(source, issue_number, division, serial_number)` — the natural key from the SCOB listing |
+| `full_text` | `MEDIUMTEXT` | Paragraph numbers kept as `[para n]` markers so chunks and citations can point to paragraphs |
+| `stored_pdf_url` | **Rename** `stored_pdf_key` | S3 key `raw/scob/{issue}/{division}/{serial}/{pdf_sha256}.pdf`; presigned GET on demand |
+| `decision_date_source` | **Add** `ENUM('PDF_RULE','PDF_LLM','MANUAL')` | How the date was obtained (§6A.3) |
+| `listing_html_s3_key` | **Add** | Snapshot of the division list page the row came from |
+| `normalized_section_keys` | **Add** `JSON` | Copy of resolved `statute_id:section_key` pairs, for filtering without a join |
+| `created_at`, `updated_at` | `DATETIME(3)` | |
+| — | **Add** `FULLTEXT(parties, key_words, summary) WITH PARSER ngram` | Keyword arm for case-law search |
+
+**`judgment_statute_refs`** (SRS 5.8) — `reference_id`, `judgment_id` FK, `statute_id` FK NULL, `normalized_section_key` `VARCHAR(16)` NULL, `raw_reference_text`, `paragraph_numbers JSON`, `found_in ENUM('KEY_WORDS','BODY')`. Index `(statute_id, normalized_section_key)` for "judgments on this section".
+
+**`judgment_chunks`** (new) — same shape as `section_chunks` with `judgment_id` FK instead of `section_id`, plus `paragraph_from`, `paragraph_to` `SMALLINT`.
+
+**`judgment_revisions`** (new) — `revision_id`, `judgment_id`, `pdf_sha256`, `stored_pdf_key`, `full_text`, `replaced_at`. Receives the old text when a PDF at the same URL changes (FR-D4).
+
 ### 4.3 Tenant Isolation in MySQL
 
 MySQL has no row-level security, so isolation is enforced in the **data-access layer** with several layers of protection:
@@ -260,7 +287,7 @@ MySQL has no row-level security, so isolation is enforced in the **data-access l
 5. **Separate DB users:**
    - `app_api`: DML on app tables, no DDL.
    - `app_worker`: same DML, and workers that handle user data receive `owner_user_id` in the job payload and use the same scoped repos.
-   - `app_scraper`: rights only on `statutes`, `statute_sections`, `section_chunks`, `scrape_*` and `outbox_events`; no access to user tables.
+   - `app_scraper`: rights only on `statutes`, `statute_sections`, `section_chunks`, `judgments`, `judgment_statute_refs`, `judgment_chunks`, `judgment_revisions`, `scrape_*` and `outbox_events`; no access to user tables.
    - `app_migrate`: DDL, used only in CI/CD.
 
 ### 4.4 Vector Index (Qdrant) & Consistency
@@ -273,6 +300,7 @@ MySQL has no row-level security, so isolation is enforced in the **data-access l
 - **Consistency via the transactional outbox:** the versioning transaction (§6.3) writes `outbox_events` rows (`SECTION_VERSION_CREATED`, `SECTION_VERSION_CLOSED`) in the **same MySQL transaction** as the law change. The `outbox` worker reads unprocessed rows and calls TEI (embed) and then Qdrant (upsert or payload update). It marks `processed_at` only after Qdrant confirms. Replays are safe because the operations are idempotent.
 - **Source of truth:** retrieval takes only `chunk_id`s and scores from Qdrant. Text, versions and citations are always re-read from MySQL by ID, so a stale vector can never show stale text.
 - **Rebuild:** `pnpm worker reindex --all` rebuilds the collection from MySQL, for example after an embedding model upgrade, using an alias swap so search has no downtime.
+- **Second collection `judgment_chunks`** (Module D): same vector settings and the same alias/rebuild pattern. Payload `{ judgment_id, division, issue_year, decision_date, section_keys[], statute_ids[], lang, paragraph_from, paragraph_to }`, with payload indexes on `division`, `issue_year`, `statute_ids` and `section_keys`. Judgments are not versioned, so there are no `is_current` / `valid_*` filters. Outbox events `JUDGMENT_UPSERTED` / `JUDGMENT_REMOVED` drive it, with the same idempotent re-read-MySQL handlers.
 
 ---
 
@@ -286,7 +314,7 @@ Base path `/api/v1`. JSON over HTTPS. Auth: `Authorization: Bearer <access JWT>`
 
 ### 5.1 Endpoint Catalogue
 
-The SRS defines 8 endpoints (✱). The rest are needed by the App Flow.
+The SRS defines 10 endpoints (✱). The rest are needed by the App Flow.
 
 | Method | Path | Purpose | Roles |
 | :--- | :--- | :--- | :--- |
@@ -304,6 +332,9 @@ The SRS defines 8 endpoints (✱). The rest are needed by the App Flow.
 | GET | `/statutes/{act_id}` | Act detail + chapter tree | any |
 | GET | ✱ `/statutes/{act_id}/sections/{sec}?as_of=YYYY-MM-DD` | Verbatim text, status, footnotes, Schedule II strip; `as_of` restricted to LAWYER/JUDGE | any |
 | GET | `/statutes/{act_id}/sections/{sec}/versions` | Version history | LAWYER, JUDGE |
+| GET | `/statutes/{act_id}/sections/{sec}/judgments` | Judgments linked to this section (newest first, AD before HCD), with an `older_than_current_version` flag | any |
+| GET | ✱ `/judgments?q=&division=&year=&act_id=&sec=&judge=` | Case-law search (hybrid, same engine as §7.1, case-law arm only) | any |
+| GET | ✱ `/judgments/{judgment_id}` | Metadata, full text by paragraph, linked sections, presigned link to the original PDF | any |
 | GET / POST | ✱ `/cases` | List (with `updated_since` cursor) / create | any |
 | GET / PATCH / DELETE | `/cases/{id}` | Detail, edit (needs `If-Match`), delete | owner |
 | GET | `/cases/{id}/conversation` | The case's conversation (creates it if missing) | LAWYER, JUDGE |
@@ -342,8 +373,9 @@ SSE event stream (`text/event-stream`, written with `reply.raw` and flushed per 
 ```text
 event: meta        data: {"message_id":"…","conversation_id":"…","law_as_of_date":null}
 event: token       data: {"t":"চেক ডিসঅনারের "}
-event: citation    data: {"ref":1,"section_id":"…","act_id":123,"sec":"138","label":"Section 138, Negotiable Instruments Act, 1881"}
+event: citation    data: {"ref":1,"kind":"SECTION","section_id":"…","act_id":123,"sec":"138","label":"Section 138, Negotiable Instruments Act, 1881"}
 event: token       data: {"t":"[1] অনুযায়ী …"}
+event: citation    data: {"ref":2,"kind":"JUDGMENT","judgment_id":"…","para":"74","label":"Md. Humayun Kabir Vs. The State, 20 SCOB [2025] AD, para 74"}
 event: done        data: {"status":"COMPLETE","usage":{"input_tokens":…,"output_tokens":…}}
 event: error       data: {"code":"UPSTREAM_TIMEOUT","retryable":true}
 ```
@@ -382,6 +414,7 @@ Citations are sent as separate `citation` events only **after** server-side vali
 | `/assistant/query` | 30 / 10 min (Citizen), 60 / 10 min (Lawyer/Judge) |
 | `/documents/scan` | 30 / hour |
 | `/voice/transcribe-query` | 60 / 10 min |
+| `/judgments` search | 60 / 10 min |
 | Dictation | 2 concurrent sessions, 6 h of audio / day |
 
 ---
@@ -432,6 +465,43 @@ The `outbox` worker chunks each new section version (§4.2) and calls TEI `/embe
 
 ---
 
+## 6A. Module D — Supreme Court Judgment (SCOB) Harvester
+
+Source: Supreme Court Online Bulletin, `https://www.supremecourt.gov.bd/web/?page=bulletin.php&menu=10&lang=`. URL patterns and list fields are in SRS §4.4. Code lives in `apps/worker/src/scob`, beside `src/scrape`, and reuses its HTTP client, limiter, robots handling and snapshot store.
+
+### 6A.1 Crawl
+- **Schedule:** BullMQ repeatable job, weekly (cron `0 4 * * 6`, `Asia/Dhaka`). SCOB adds about one issue a year, so a nightly crawl is not needed. A manual `--scob-backfill` CLI command runs the first full load.
+- **HTTP:** the same `undici` client as §6.1 with its own **1 request/second limiter for this host** (the bdlaws limiter is unchanged), `robots.txt` honoured, generic product User-Agent, conditional GET, exponential backoff. As in §6.1, the crawler refuses to run if `robots.txt` cannot be fetched.
+- **Discovery:** parse the index page for issue links → for each issue, the AD (`div_id=1`) and HCD (`div_id=2`) list pages. Both list templates (per-issue `bulletin_list_{AD|HD}_{n}.php` for newer issues and the generic `bulletin_list.php` for issues 1–14) are recognised. URL patterns and selectors are config (`scob-source-config.ts`), not code, and are confirmed in the JUD-01 spike.
+- **Snapshots:** list pages gzip-compressed to S3 (`raw/scob/lists/{issue}/{division}/{fetched_at}.html.gz`); PDFs to `raw/scob/{issue}/{division}/{serial}/{pdf_sha256}.pdf`.
+
+### 6A.2 List Parsing
+`cheerio` parses each list row into `{serial, parties, authoring_judge, citation, key_words, summary, key_ratio_paragraphs[], pdf_href}`. Text is stored exactly as published (NFC only). The PDF href is resolved against the page URL and URL-encoded. A row without a PDF link is recorded as a `scrape_events` warning and skipped.
+
+### 6A.3 PDF Processing (BullMQ `scob` queue, one job per judgment)
+| Step | Implementation |
+| :--- | :--- |
+| **1. Fetch & hash** | Download the PDF, check the magic bytes and size limit (50 MB), `sha256` of the bytes. Same hash as the stored row → stop |
+| **2. Sanitize** | `qpdf` removes JavaScript and embedded files (as §12.6) |
+| **3. Text** | `pdftotext -layout`. Bijoy detection + converter as §8.2 stage 2. If under 200 characters per page on average, treat the page as scanned → `OcrProvider` (needs BE-20); until OCR is available the judgment is set to `NEEDS_REVIEW` |
+| **4. Paragraphs** | Detect numbered paragraphs (`^\s*\d+\.` and Bangla digit equivalents) and store them as `[para n]` markers in `full_text` |
+| **5. Metadata** | Rules first: case number (`(Civil\|Criminal) (Appeal\|Petition…) No\. … of \d{4}`, Bangla equivalents), decision date (the "Judgment on" / "রায় প্রদানের তারিখ" line), bench (judge names before "J." / "C.J."). Fields the rules miss go to `generateObject` with a small Zod schema; an LLM value is kept **only if it appears verbatim in the text** (`decision_date_source = PDF_LLM`). Public data only, so this is allowed through the relay |
+| **6. Statute links** | The §8.4 section detector + Act dictionary run over `key_words` and the body. Resolved pairs go to `judgment_statute_refs` with `statute_id`; anything else is kept with `statute_id = NULL` |
+| **7. Write** | One MySQL transaction: upsert `judgments` (old text → `judgment_revisions` if the hash changed), replace `judgment_statute_refs`, write outbox `JUDGMENT_UPSERTED` |
+
+Logs carry IDs, counts and timings only; judgment text is public, but the general rule of no document text in logs still applies.
+
+### 6A.4 Chunking & Indexing
+The outbox worker chunks `full_text` on paragraph boundaries (350–500 tokens, the same estimator as §6.4). Each chunk is prefixed with `"{parties}, {citation} ({division}) — para {from}–{to}"`. The key-ratio paragraph(s) always start a new chunk, so they are retrievable on their own. Embedding: TEI `bge-m3`, upsert into `judgment_chunks` (§4.4).
+
+### 6A.5 Linking to Versioned Law
+A judgment interprets a section as it stood on the `decision_date`. For each `judgment_statute_refs` row, the API compares the decision date with the `valid_from` of the section's **current** version. If the current version started later, the judgment is returned with `older_than_current_version = true` and the UI shows "Decided before this section was amended on …" (SRS FR-D6).
+
+### 6A.6 Admin
+The sync dashboard (App Flow §15.2) also shows SCOB runs: issues found, judgments new/changed/failed, and the `NEEDS_REVIEW` queue, where an admin can enter a missing decision date or case number (`decision_date_source = MANUAL`, logged in `audit_log`).
+
+---
+
 ## 7. Module — Citation-Backed RAG Assistant
 
 ### 7.1 Pipeline
@@ -446,8 +516,12 @@ query ─┬─> [1] Normalize (NFC, Bangla digits, abbreviation expansion: "CrP
        │        • fuse in Node with Reciprocal Rank Fusion (k=60)
        ├─> [4] Rerank top-40 → top-8 via TEI /rerank (bge-reranker-v2-m3)
        ├─> [5] Sufficiency gate: best rerank score < τ (calibrated on eval set) → NO_PROVISION path
-       ├─> [6] Hydrate the 8 chunks' sections from MySQL by ID (source of truth)
-       ├─> [7] Prompt assembly (role system prompt + numbered SOURCES + conversation history)
+       ├─> [5a] Case-law arm (Module D, runs in parallel with [3]–[4]):
+       │        Qdrant judgment_chunks top-20, boosted when statute_ids/section_keys match the
+       │        top statute hits → rerank → up to 3 judgment chunks above τ_j
+       ├─> [6] Hydrate the 8 chunks' sections + the judgment chunks from MySQL by ID (source of truth)
+       ├─> [7] Prompt assembly (role system prompt + numbered SOURCES, statutes first, then
+       │        JUDGMENT sources + conversation history)
        ├─> [8] Claude streaming generation (AI SDK streamText)
        └─> [9] Streaming citation validator → SSE to client
 ```
@@ -472,6 +546,8 @@ WHERE s.is_current = 1
 WHERE s.valid_from <= :d AND (s.valid_to IS NULL OR s.valid_to > :d)
 ```
 
+**Case-law arm rules.** The sufficiency gate in [5] looks only at the statute arm: judgments add to an answer but never rescue a NO_PROVISION. Judgment chunks don't take part in the point-in-time filter. Instead, a judgment whose decision date is before the as-of (or current) version of a linked section is marked in its SOURCES block (`decided_on_earlier_version: true`), and the prompt tells the model to say so. The case-law arm runs in parallel and must stay inside the §11.1 retrieval and rerank budgets (to be measured in JUD-07); if it doesn't, the answer is generated from statute sources only and the matched judgments are shown as a "Related judgments" list under the answer (no inline citations).
+
 ### 7.2 Conversation Context Isolation (App Flow §5.2)
 The context builder loads history **only** through `scoped(db, userId).messages.byConversation(conversationId)`. For a case conversation it also adds:
 - the case's `structured_analysis` (from its FIR scans), as compact JSON
@@ -487,15 +563,16 @@ Three frozen system prompts (`CITIZEN`, `LAWYER`, `JUDGE`) live in versioned fil
 - Answer **only** from the SOURCES block, and cite every legal claim as `[n]`, where `n` is a source number.
 - If the sources don't answer the question, say so explicitly. Never draw on outside legal knowledge.
 - Never state bail, cognizance or compoundability status unless it appears in a provided `SCHEDULE_II` source row.
+- Cite a judgment only from a `JUDGMENT` source, name the division, and state its holding only as far as the cited paragraph supports it. A legal rule is always cited to the statute too; a judgment never stands alone as the authority for what the law says. Never name a case that is not in SOURCES.
 - Respond in `{language}`, and quote statutory text in its original language.
 - `LAWYER`: an analytical, adversarial framing is allowed. `JUDGE`: neutral, bench-memo structure, no advocacy. `CITIZEN`: plain language and practical steps, plus a disclaimer that this is not legal representation.
 
 ### 7.4 Citation Validation (G1)
-- Each source block passed to the model carries a server-side mapping `n → section_id`.
+- Each source block passed to the model carries a server-side mapping `n → {kind: SECTION, section_id}` or `n → {kind: JUDGMENT, judgment_id, paragraph}`. `messages.citations` stores the same shape.
 - The validator is a `TransformStream` over the AI SDK `textStream`. It buffers characters from `[` until `]` before emitting text:
   - `[n]` with `n` in the mapping → emit the token and a `citation` event (sent once per `n`).
   - `n` not in the mapping → drop the marker, add `INVALID_CITATION_STRIPPED` to `messages.flags`, and increment a metric.
-- **After generation:** if the answer contains legal assertions but zero valid citations (a heuristic plus a sampled LLM check), the message is flagged for admin review.
+- **After generation:** if the answer contains legal assertions but zero valid citations (a heuristic plus a sampled LLM check), the message is flagged for admin review. An answer that cites judgments but no statute section is flagged `JUDGMENT_ONLY_CITATION`. Case names or SCOB-style citations in the text that don't match a source (regex on `Vs.` / `SCOB`) are flagged `UNSOURCED_CASE_REFERENCE`.
 - **NO_PROVISION path:** when the sufficiency gate trips, the server streams a fixed, localized message and skips generation entirely. This is deterministic and saves cost.
 
 ### 7.5 Cross-Lingual Behavior
@@ -684,6 +761,7 @@ The relay adds a network hop, so measure its overhead in Phase 2. If the model s
 | Concurrent dictation sessions | 15 | 300 |
 | Scans / day | 300 | 10,000 |
 | Corpus | ~1,480 Acts, ~60k section versions, ~150k chunks | 5× chunks |
+| Case law (SCOB) | 20 issues × 2 divisions, roughly 1,000–2,000 judgments, ~50k chunks (estimate; JUD-01 measures it) | Grows by about one issue a year |
 
 **Sizing:**
 - **Qdrant:** 150k × 1024-dim float32 ≈ 0.6 GB of vectors plus HNSW overhead, which fits in 2–4 GB RAM. Scalar quantization (int8) is available if needed.
@@ -713,7 +791,7 @@ The relay adds a network hop, so measure its overhead in Phase 2. If the model s
 | Data | At Rest | In Transit | Retention |
 | :--- | :--- | :--- | :--- |
 | MySQL (RDS) | Storage encryption (AES-256, KMS CMK); automated backups encrypted | TLS 1.2+ (`require_secure_transport=ON`) | Until the user deletes it; backups 14 days |
-| Qdrant | Encrypted EBS/EFS volume | TLS + API key; private subnet only | Statute data only — **no user data** |
+| Qdrant | Encrypted EBS/EFS volume | TLS + API key; private subnet only | Public statute and judgment data only — **no user data** |
 | S3 vault | SSE-KMS; bucket policy denies unencrypted PUT and non-TLS | TLS | Until deleted; exports 24 h; dictation audio 30 days (🔶 D6) |
 | Redis | Encryption at rest + in-transit enabled | TLS | Ephemeral |
 | Logs | No document text, transcripts or queries. IDs only, with `pino` redaction paths | | 30 days |
@@ -782,7 +860,8 @@ All processors are listed in the privacy notice (App Flow §14).
   - BullMQ queue depth
   - LLM tokens per route
   - Scraper changes per run and quarantines
-- **Alerts:** SLA breaches (p90 over target for 15 min), queue depth over 100, outbox lag over 10 min, the relay circuit opening, scraper failure two nights in a row, error rate above 2%.
+  - SCOB runs: judgments new/changed/failed, `NEEDS_REVIEW` count, `UNSOURCED_CASE_REFERENCE` / `JUDGMENT_ONLY_CITATION` flags
+- **Alerts:** SLA breaches (p90 over target for 15 min), queue depth over 100, outbox lag over 10 min, the relay circuit opening, scraper failure two nights in a row, SCOB crawl failure two weeks in a row, error rate above 2%.
 
 ---
 
@@ -791,8 +870,8 @@ All processors are listed in the privacy notice (App Flow §14).
 ### 14.1 Automated Tests
 | Layer | Scope |
 | :--- | :--- |
-| **Unit (Vitest)** | Normalizer & hashing · Bijoy→Unicode converter · section detector (≥ 300 citation strings: Bangla/English, letters, combinations) · date/delay calculator · glossary corrector · citation validator (streaming edge cases: split brackets, unknown refs) · RRF fusion |
-| **Integration** | Versioning transaction (amend → archive → point-in-time read) + `current_key` uniqueness under concurrency · outbox → Qdrant sync and replay idempotency · **tenant isolation suite over every route** (§4.3) · case-conversation isolation (§7.2) · Citizen blocked from case conversations (service + trigger) · optimistic concurrency & revision preservation |
+| **Unit (Vitest)** | Normalizer & hashing · Bijoy→Unicode converter · section detector (≥ 300 citation strings: Bangla/English, letters, combinations) · date/delay calculator · glossary corrector · citation validator (streaming edge cases: split brackets, unknown refs) · RRF fusion · SCOB list parser (both templates, fixtures from JUD-01) · judgment paragraph splitter and metadata rules |
+| **Integration** | SCOB ingest: new judgment → changed PDF → revision kept, re-indexed; replay idempotent · Versioning transaction (amend → archive → point-in-time read) + `current_key` uniqueness under concurrency · outbox → Qdrant sync and replay idempotency · **tenant isolation suite over every route** (§4.3) · case-conversation isolation (§7.2) · Citizen blocked from case conversations (service + trigger) · optimistic concurrency & revision preservation |
 | **Contract** | OpenAPI generated from Zod → typed clients for web (`openapi-typescript`, or the shared `packages/contracts` directly) and mobile (`openapi-generator` dart). CI fails on breaking changes |
 | **E2E** | Playwright (web): login → ask → open verifier; upload FIR → result. Flutter `integration_test`: scan → result; push-to-talk |
 | **Load** | k6: 50 concurrent SSE streams, 20 dictation sockets, 100 scans/10 min, with SLA assertions |
@@ -808,6 +887,8 @@ All processors are listed in the privacy notice (App Flow §14).
 | **OCR** | Same set | Character error rate ≤ 5% printed, ≤ 15% handwritten |
 | **STT** | 5 h of legal dictation (10+ speakers, code-switched) | WER ≤ 15% · glossary term accuracy ≥ 0.95 |
 | **Schedule II** | Every row checked against the source schedule | 100% |
+| **Case-law retrieval & citation** | 60 questions where lawyers name the expected judgment(s) and paragraph | Judgment citation precision ≥ 0.95 · expected-judgment recall@3 ≥ 0.80 · 0 fabricated case names or citations · 0 judgment-only answers |
+| **Judgment metadata** | 50 judgments sampled across issues and both divisions, checked by hand against the PDF | Citation, division, parties 100% · decision date and case number ≥ 0.95 · statute-link precision ≥ 0.95 |
 
 The eval runner (`evals/`, Node) runs nightly on staging and on every prompt, model, SDK or relay config change, and stores results per run for comparison.
 
@@ -821,6 +902,7 @@ The eval runner (`evals/`, Node) runs nightly on staging and on every prompt, mo
   - `/chat/[conversationId]`
   - `/cases/[caseId]/(overview|documents|drafts|conversation)`
   - `/library/[actId]/[section]` (public, SSR, SEO)
+  - `/library/judgments` and `/library/judgments/[judgmentId]` (public, SSR)
 - **Shared types:** imports Zod schemas and types from `packages/contracts`, so the web and API can't drift.
 - **SSE:** `fetch` + `ReadableStream` parser, because `EventSource` doesn't support `POST` or custom auth headers. The browser **never** calls the LLM directly, and no AI keys exist in the web bundle.
 - **Dictation:** `getUserMedia` → `AudioWorklet` downsampling to 16 kHz PCM → WebSocket. Interim text is rendered as a TipTap decoration and the final text is inserted as a transaction.
@@ -843,9 +925,9 @@ The eval runner (`evals/`, Node) runs nightly on staging and on every prompt, mo
 | Phase (SRS §8) | Technical Deliverables from This TRD | Exit Criteria |
 | :--- | :--- | :--- |
 | **1: Weeks 1–3** | Monorepo, CI, Terraform skeleton · MySQL schema (Drizzle), scoped repos + isolation suite · §6 scraper, normalizer, versioning, outbox · TEI + Qdrant + embedding backfill for the top 50 Acts · Schedule II table + lawyer verification | Point-in-time eval 100% · Schedule II 100% verified · nightly sync green 5 days in a row · outbox lag < 10 min |
-| **2: Weeks 4–6** | §5 auth, conversations, cases APIs · §7 RAG pipeline, validator, role prompts · **AI relay integration + relay checks** (model IDs, caching, effort options, latency overhead) · Next.js web: chat, verifier, library, cases · eval runner + Q&A golden set v1 | Q&A eval pass bar · first token ≤ 1.5 s p90 on staging · D10 relay decision recorded |
-| **3: Weeks 7–9** | §8 scan pipeline end to end · §9 transcribe-query + dictation WS + glossary v1 · §10 export · web dictation editor | FIR/OCR/STT eval pass bars · 6 s / 800 ms SLAs on staging |
-| **4: Weeks 10–12** | Flutter app (scanner, push-to-talk, dictation, offline queue, push) · full ~1,480-Act ingestion · admin console · load tests · security review · pilot onboarding | Load test SLAs · no open high-severity security findings · pilot go-live |
+| **2: Weeks 4–6** | §5 auth, conversations, cases APIs · §7 RAG pipeline, validator, role prompts · **AI relay integration + relay checks** (model IDs, caching, effort options, latency overhead) · Next.js web: chat, verifier, library, cases · eval runner + Q&A golden set v1 · §6A SCOB harvester, backfill of all issues, statute linking, `judgment_chunks` index | Q&A eval pass bar · first token ≤ 1.5 s p90 on staging · D10 relay decision recorded · all SCOB issues ingested, judgment-metadata eval passed |
+| **3: Weeks 7–9** | §8 scan pipeline end to end · §9 transcribe-query + dictation WS + glossary v1 · §10 export · web dictation editor · case-law arm in §7.1, judgment citations, `/judgments` API, web judgment viewer | FIR/OCR/STT eval pass bars · 6 s / 800 ms SLAs on staging · case-law eval pass bar |
+| **4: Weeks 10–12** | Flutter app (scanner, push-to-talk, dictation, offline queue, push, case-law viewer) · full ~1,480-Act ingestion · admin console · load tests · security review · pilot onboarding | Load test SLAs · no open high-severity security findings · pilot go-live |
 
 ---
 
@@ -863,4 +945,5 @@ The eval runner (`evals/`, Node) runs nightly on staging and on every prompt, mo
 | D8 | Screenshot blocking on case screens | Enabled on Android | May frustrate users who share with clients; confirm with the pilot |
 | D9 | Vector store & keyword search | Qdrant + MySQL ngram FULLTEXT | MySQL HeatWave (native vector search, Oracle Cloud only); OpenSearch for both arms if Bangla keyword recall falls short |
 | D10 | **AI relay in production** | Relay used only once DPA, no-training and no-retention terms are confirmed | **Anthropic direct API** (`ANTHROPIC_BASE_URL` unset). Required if the relay can't meet §12.4 |
-| D11 | Qdrant hosting | Self-hosted on ECS/EC2 | Qdrant Cloud (managed; adds another processor, but it holds statute data only) |
+| D11 | Qdrant hosting | Self-hosted on ECS/EC2 | Qdrant Cloud (managed; adds another processor, but it holds public statute and judgment data only) |
+| D12 | Case-law scope | **Decided 2026-11-04:** SCOB reported judgments (AD + HCD) only, English/original-language PDFs | Bengali translations, unreported judgments, cause lists, subordinate courts: post-MVP. A paid law-report source would need licensing |
