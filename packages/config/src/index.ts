@@ -39,6 +39,11 @@ export const envSchema = z.object({
   S3_BUCKET: z.string().default('lawassist-dev'),
   S3_ACCESS_KEY_ID: z.preprocess(emptyToUndefined, z.string().optional()),
   S3_SECRET_ACCESS_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  /**
+   * Server-side encryption that presigned uploads must use. The AWS bucket policy denies
+   * unencrypted PUTs (TRD §12.3), so deployed envs set `aws:kms`. Unset locally (SeaweedFS).
+   */
+  S3_SSE: z.preprocess(emptyToUndefined, z.enum(['aws:kms', 'AES256']).optional()),
 
   /** Empty = call Anthropic directly; set = AI relay (TRD §7.6, decision D10). */
   ANTHROPIC_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
@@ -69,7 +74,7 @@ export class ConfigError extends Error {
 }
 
 /** Secrets that must be present outside local development and tests. */
-const REQUIRED_IN_DEPLOYED_ENVS = ['ANTHROPIC_API_KEY', 'JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'OTP_HMAC_KEY'] as const;
+const REQUIRED_IN_DEPLOYED_ENVS = ['ANTHROPIC_API_KEY', 'JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'OTP_HMAC_KEY', 'S3_SSE'] as const;
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): AppConfig {
   const parsed = envSchema.safeParse(source);

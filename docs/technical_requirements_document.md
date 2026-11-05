@@ -642,9 +642,9 @@ const { object } = await generateObject({
 ## 8. Module B — FIR & Document Scan Pipeline
 
 ### 8.1 Upload Path
-1. The client calls `POST /cases/{id}/documents/upload-url` and receives a presigned S3 PUT URL (`@aws-sdk/s3-request-presigner`): 10 min TTL, content-type and max size (25 MB) enforced, key `tenants/{user_id}/cases/{case_id}/{artifact_id}/original.{ext}`.
+1. The client calls `POST /cases/{id}/documents/upload-url` with `{content_type, size_bytes}` and receives a presigned S3 PUT URL (`@aws-sdk/s3-request-presigner`): 10 min TTL, key `tenants/{user_id}/cases/{case_id}/{artifact_id}/original.{ext}`. Content-Type and Content-Length (≤ 25 MB) are signed headers, plus `x-amz-server-side-encryption` when `S3_SSE` is set (required in staging/production), so S3 rejects an upload of another type, size or without encryption.
 2. The client uploads directly to S3. The mobile app sends the scanner's output as one multi-page PDF or as JPEG pages at most 2000 px on the long edge.
-3. The client calls `POST …/documents/scan` with `{s3_key, artifact_type, page_count}`. The API verifies the object with `HeadObject`, then adds a **BullMQ flow** `scan_pipeline(artifact_id, owner_user_id)` and returns `202`.
+3. The client calls `POST …/documents/scan` with `{s3_key, artifact_type, page_count}`. The API accepts only a key it handed out for this user and case, verifies the object with `HeadObject` (exists, ≤ 25 MB, same Content-Type) and its first 4,100 bytes against the declared type (`file-type`), then adds a **BullMQ** job `scan_pipeline(artifact_id, owner_user_id)` (job id = artifact id, so a retried registration never starts a second pipeline) and returns `202`. `qpdf` sanitization (§12.6) is the first worker stage, before any parsing.
 4. Progress reaches clients through `GET …/artifacts/{id}/events` (SSE, backed by Redis pub/sub). If the mobile app is in the background, a push notification (`firebase-admin` FCM, APNs via FCM) is sent when processing reaches READY or FAILED.
 
 ### 8.2 Pipeline Stages (BullMQ flow on the `ocr` → `analysis` queues)

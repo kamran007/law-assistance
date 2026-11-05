@@ -40,6 +40,7 @@ Legend: ✅ done & verified · 🟡 code written, verification pending · ⬜ no
 | BE-12 | Conversations API | ✅ | `GET/POST /conversations` (general only), `GET /conversations/{id}` (messages oldest-first, `before` paging, `has_more`; never `retrieval_trace`, token counts or flags), `PATCH` rename, `DELETE` (general only; a case conversation → 409 `CASE_CONVERSATION`). Case conversations are created with the case (BE-15). Messages are written by BE-13 |
 | BE-15 | Cases API | ✅ | `GET /cases` (+ `updated_since` with tombstones and `server_time`), `POST` (Lawyer/Judge get the case conversation in the same transaction; Citizens never), `GET/PATCH/DELETE /cases/{id}` with `ETag` + required `If-Match` (428 if missing, 409 with the current copy on conflict), `GET /cases/{id}/conversation` (created if missing for a newly approved lawyer; Citizens 403). No future offense dates. All via `scoped()` |
 | QA-01 | Tenant isolation suite | ✅ | Every route declares `config.access` (`public`/`self`/`tenant`). `isolation.int.test.ts`: user A calls every tenant route with user B’s ids → 404 with nothing leaked, 401 without a token, collections never show B’s data, B’s data intact afterwards; **coverage check fails on an unclassified route or an untested tenant route**. Runs in CI with the integration job. **Mutation-checked:** removing the owner filter in `scoped.ts` failed 5 tests |
+| BE-21 | Upload flow | ✅ | `apps/api/src/modules/documents`: `POST /cases/{id}/documents/upload-url` (PDF/JPEG/PNG/DOCX, ≤ 25 MB; Content-Type + Content-Length signed; SSE header signed when `S3_SSE` is set, required in staging/prod), `POST /cases/{id}/documents/scan` (only keys handed out for this user and case; HeadObject size/type; **magic-byte check** with `file-type`; artifact `UPLOADED`; BullMQ `scan` job with job id = artifact id), `GET /cases/{id}/artifacts`, `GET/DELETE /cases/{id}/artifacts/{art_id}` (artifact must belong to that case). **Verified:** unit (keys, magic bytes incl. a real DOCX, presigned signed headers) + `documents.int.test.ts` 6/6 + isolation suite (cross-tenant, B’s key via A’s case, artifact-id clash); live run on the local stack (PUT to SeaweedFS 200 → registered → job in Redis; no keys or text in logs). `qpdf` moved to BE-22. Consumer of the `scan` queue is BE-22 |
 | BE-06 | Statutes read API | ✅ | `apps/api/src/modules/statutes`: `GET /api/v1/statutes` (ngram FULLTEXT search on EN/BN titles, status/year filters, paging), `/statutes/{act_id}` (chapter tree, natural section order), `/sections/{sec}` (verbatim text, footnotes, verified Schedule II strip; Bangla section numbers accepted), `?as_of=` and `/versions` for verified LAWYER/JUDGE (401/403 otherwise; auth is a stub until BE-03/04). Redis cache keyed by an Act generation the scraper bumps after each sync. **Verified:** `statutes.int.test.ts` 16/16 on MySQL 8.4 (point-in-time incl. `valid_to` boundary, not-yet-in-force 404, unverified Schedule II never served, cache); live smoke on the 9 real Acts; live cache invalidation (scrape of Act 16 → generation 0 → 1) |
 | DATA-10 | Nightly job + weekly full re-crawl + dashboard data | 🟡 | Schedulers exist since S1 (`main.ts`). `scrape_runs`/`scrape_events` are written. Dashboard query/API not started (belongs with the admin API) |
 
@@ -65,11 +66,11 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit) | ✅ 162 / 162 passed (11 files) |
+| `pnpm test` (unit) | ✅ 168 / 168 passed (12 files) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
-| `pnpm test:integration` (local Docker) | ✅ 8 files / 94 tests (db, versioning, index, grants, statutes API, auth, cases/conversations, tenant isolation) |
+| `pnpm test:integration` (local Docker) | ✅ 9 files / 111 tests (db, versioning, index, grants, statutes API, auth, cases/conversations, tenant isolation, documents) |
 | Sprint 1 demo (live portal, local stack) | ✅ 9 Acts → 1,804 sections; re-run 0 changes; edited snapshot → Penal Code s.420 v2 current (`DETECTED_ON_SYNC`), v1 `valid_to` 2026-11-04; outbox CLOSED + NOTIFY_AFFECTED_CASES |
 | Semgrep 1.183 (Docker image; `apps/api/src`, `apps/worker/src`, `packages/providers/src`, `packages/config/src`; + `p/jwt` for auth) | ✅ 0 findings |
 | Scraper coverage (parser / http-client / discover) | 94% / 99% / 100% lines |
@@ -116,6 +117,10 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-04 | A section row without a number continues the section above; its marginal note goes into the hash. Display heading = first row’s note | The portal splits sections over rows. Single-row sections hash exactly as before |
 | 2026-11-04 | Range rows (`23 and 24.`, `100-103.`) become one section per number, with the shared text | A lookup of CrPC s.24 must find its "[Repealed]" text |
 | 2026-11-04 | Discovery uses only the chronological index | The main index lists volumes only; the alphabetical index is about 57 MB |
+| 2026-11-05 | Upload registration accepts only keys of the exact shape handed out, for the caller and that case; the artifact id comes from the key | A client can never register another user’s object or an arbitrary bucket key as its document |
+| 2026-11-05 | `qpdf` sanitization runs as the first worker stage (BE-22), not in the API | It needs the `qpdf` binary and CPU; the API image stays small. Nothing parses the file before that stage |
+| 2026-11-05 | `S3_SSE` config; required in staging/production | The bucket policy denies unencrypted PUTs (TRD §12.3), so presigned URLs must sign the SSE header |
+| 2026-11-05 | API uses a second Redis connection for BullMQ | The cache/rate-limit connection fails fast; BullMQ needs one that retries |
 | 2026-11-04 | Every API route declares `config.access`; the isolation suite enforces coverage | A new tenant route can’t be merged without a cross-user test (TRD §4.3 point 4) |
 | 2026-11-04 | Case metadata PATCH: missing `If-Match` → 428, stale → 409 with the current copy in the problem body | TRD §5.4; the client can show the other device’s change without another round trip |
 | 2026-11-04 | `GET /cases/{id}/conversation` checks ownership before role | Another user’s case id is always 404, whatever the caller’s role (no existence leak) |
@@ -137,6 +142,6 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 1. Merge `feature/data-01-spike` (DATA-01/03/04, SeaweedFS) once its PR is green.
 2. Decide the nightly-crawl scope (open item 1), then finish DATA-10.
 3. DATA-08: confirm the top-50 Act list, free disk for TEI (C: has 7.5 GB free; TEI needs ~6 GB), then `docker compose --profile ml up -d`, ingest and embed. Closes OPS-02 too.
-4. Merge in order: `feature/data-01-spike` → `feature/api-core` (BE-05/06) → `feature/auth` (BE-03/04) → `feature/cases` (BE-12/15, QA-01).
-5. BE-07 retrieval (needs TEI for the dense arm and the reranker), then BE-08 LLM provider + BE-13 assistant SSE. Unblocked meanwhile: BE-21 upload flow (presigned S3 + validation) and WEB-01 Next.js scaffold.
+4. Merge in order: `feature/data-01-spike` → `feature/api-core` (BE-05/06) → `feature/auth` (BE-03/04) → `feature/cases` (BE-12/15, QA-01) → `feature/scan-upload` (BE-21).
+5. BE-07 retrieval (needs TEI for the dense arm and the reranker), then BE-08 LLM provider + BE-13 assistant SSE. Unblocked meanwhile: BE-22 scan pipeline stages 1–2 (qpdf, pdftotext/pdftoppm, sharp, mammoth; worker image needs Poppler + qpdf) and WEB-01 Next.js scaffold.
 6. Start PRE-11 (SCOB terms of use) and PRE-12 (LEGAL case-law questions) early. JUD-01 spike can run any time; it's independent of bdlaws.

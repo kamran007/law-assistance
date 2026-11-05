@@ -30,7 +30,7 @@ describe('loadConfig', () => {
   });
 
   it('requires an OTP key and refuses console OTP delivery outside development', () => {
-    const secrets = { ANTHROPIC_API_KEY: 'k', JWT_PRIVATE_KEY: 'p', JWT_PUBLIC_KEY: 'q' };
+    const secrets = { ANTHROPIC_API_KEY: 'k', JWT_PRIVATE_KEY: 'p', JWT_PUBLIC_KEY: 'q', S3_SSE: 'aws:kms' };
     expect(() => loadConfig({ ...base, ...secrets, NODE_ENV: 'staging' })).toThrow(/OTP_HMAC_KEY: required in staging/);
     expect(() => loadConfig({ ...base, ...secrets, NODE_ENV: 'production', OTP_HMAC_KEY: 'x'.repeat(32) })).toThrow(/OTP_DELIVERY/);
     expect(() => loadConfig({ ...base, OTP_HMAC_KEY: 'too-short' })).toThrow(ConfigError);

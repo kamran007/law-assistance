@@ -261,6 +261,38 @@ export function scoped(db: Db, userId: string) {
       return row ?? null;
     },
 
+    /**
+     * Registers an uploaded document (TRD §8.1 step 3) with status UPLOADED. The id was handed out
+     * with the upload URL, so a retried registration returns the existing row instead of failing.
+     * Returns null if the case isn't this user's, or the id already belongs to someone else's row.
+     */
+    async createUpload(input: {
+      artifactId: string;
+      caseFileId: string;
+      artifactType: CaseArtifact['artifactType'];
+      fileStorageKey: string;
+      mimeType: string;
+      pageCount?: number | null;
+    }): Promise<{ row: CaseArtifact; created: boolean } | null> {
+      if (!(await caseFilesRepo.findById(input.caseFileId))) return null;
+      try {
+        await db.insert(caseArtifacts).values({ ...input, ownerUserId: userId, processingStatus: 'UPLOADED' });
+        return { row: (await artifactsRepo.findById(input.artifactId))!, created: true };
+      } catch (err) {
+        if ((err as { cause?: { errno?: number } }).cause?.errno !== 1062) throw err;
+        const existing = await artifactsRepo.findById(input.artifactId);
+        return existing && existing.caseFileId === input.caseFileId ? { row: existing, created: false } : null;
+      }
+    },
+
+    async softDelete(artifactId: string): Promise<boolean> {
+      const [res] = await db
+        .update(caseArtifacts)
+        .set({ deletedAt: new Date() })
+        .where(and(eq(caseArtifacts.artifactId, artifactId), eq(caseArtifacts.ownerUserId, userId), isNull(caseArtifacts.deletedAt)));
+      return res.affectedRows === 1;
+    },
+
     async listByCase(caseFileId: string): Promise<CaseArtifact[] | null> {
       if (!(await caseFilesRepo.findById(caseFileId))) return null;
       return db

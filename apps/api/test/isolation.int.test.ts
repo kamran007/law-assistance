@@ -1,4 +1,6 @@
-import { scoped } from '@lawassist/db';
+import { newId, scoped } from '@lawassist/db';
+import { uploadKey } from '../src/modules/documents/upload-policy';
+import { SAMPLES } from './helpers/samples';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API_PREFIX } from '../src/app';
 import { startFullApp, type FullApp } from './helpers/full-app';
@@ -12,7 +14,7 @@ import { startFullApp, type FullApp } from './helpers/full-app';
 let f: FullApp;
 let a: { userId: string; token: string };
 let b: { userId: string; token: string };
-const ids = { bCase: '', bCaseConv: '', bGeneralConv: '' };
+const ids = { bCase: '', bCaseConv: '', bGeneralConv: '', bArtifact: '', bKey: '', aCase: '' };
 
 beforeAll(async () => {
   f = await startFullApp();
@@ -24,6 +26,11 @@ beforeAll(async () => {
   ids.bCaseConv = (await repoB.conversations.findForCase(bCase.caseFileId))!.conversationId;
   ids.bGeneralConv = (await repoB.conversations.createGeneral({ title: 'B private chat' })).conversationId;
   await repoB.messages.append(ids.bGeneralConv, { role: 'USER', content: 'B secret question' });
+  ids.bArtifact = newId();
+  ids.bKey = uploadKey(b.userId, ids.bCase, ids.bArtifact, 'application/pdf');
+  f.storage.put(ids.bKey, SAMPLES.pdf, 'application/pdf');
+  await repoB.artifacts.createUpload({ artifactId: ids.bArtifact, caseFileId: ids.bCase, artifactType: 'FIR_SCAN', fileStorageKey: ids.bKey, mimeType: 'application/pdf' });
+  ids.aCase = (await scoped(f.db, a.userId).caseFiles.create({ title: 'A own case' }, { withConversation: false })).caseFileId;
 }, 180_000);
 afterAll(() => f?.stop());
 
@@ -43,6 +50,11 @@ const attacks: Record<string, Attack> = {
   'GET /api/v1/conversations/:id': { url: () => `/conversations/${ids.bGeneralConv}` },
   'PATCH /api/v1/conversations/:id': { url: () => `/conversations/${ids.bGeneralConv}`, payload: { title: 'pwned' } },
   'DELETE /api/v1/conversations/:id': { url: () => `/conversations/${ids.bGeneralConv}` },
+  'POST /api/v1/cases/:id/documents/upload-url': { url: () => `/cases/${ids.bCase}/documents/upload-url`, payload: { content_type: 'application/pdf', size_bytes: 100 } },
+  'POST /api/v1/cases/:id/documents/scan': { url: () => `/cases/${ids.bCase}/documents/scan`, payload: { s3_key: ids.bKey, artifact_type: 'FIR_SCAN' } },
+  'GET /api/v1/cases/:id/artifacts': { url: () => `/cases/${ids.bCase}/artifacts` },
+  'GET /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}` },
+  'DELETE /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}` },
 };
 
 /** Tenant routes without an id: they act on the caller's own data; checked for leaks below. */
@@ -100,11 +112,28 @@ describe('cross-tenant access', () => {
     expect(await scoped(f.db, b.userId).conversations.findById(conv.conversation_id)).toBeNull();
   });
 
+  it('can’t reach B’s document through A’s own case, or register B’s uploaded file as A’s', async () => {
+    const h = { authorization: `Bearer ${a.token}` };
+    for (const method of ['GET', 'DELETE'] as const) {
+      const res = await f.app.inject({ method, url: `${API_PREFIX}/cases/${ids.aCase}/artifacts/${ids.bArtifact}`, headers: h });
+      expect(res.statusCode).toBe(404);
+    }
+    const steal = await f.app.inject({ method: 'POST', url: `${API_PREFIX}/cases/${ids.aCase}/documents/scan`, headers: h, payload: { s3_key: ids.bKey, artifact_type: 'FIR_SCAN' } });
+    expect(steal.json()).toMatchObject({ status: 422, code: 'INVALID_UPLOAD_KEY' });
+    // Even a key in A's own namespace that reuses B's artifact id can't take B's row.
+    const reuse = uploadKey(a.userId, ids.aCase, ids.bArtifact, 'application/pdf');
+    f.storage.put(reuse, SAMPLES.pdf, 'application/pdf');
+    const clash = await f.app.inject({ method: 'POST', url: `${API_PREFIX}/cases/${ids.aCase}/documents/scan`, headers: h, payload: { s3_key: reuse, artifact_type: 'FIR_SCAN' } });
+    expect(clash.statusCode).toBe(404);
+    expect(f.scanJobs.filter((j) => j.ownerUserId === a.userId)).toEqual([]);
+  });
+
   it('user B’s data is intact after all the attacks', async () => {
     const repoB = scoped(f.db, b.userId);
     expect(await repoB.caseFiles.findById(ids.bCase)).toMatchObject({ title: 'B private case', version: 1, deletedAt: null });
     expect(await repoB.conversations.findById(ids.bGeneralConv)).toMatchObject({ title: 'B private chat', deletedAt: null });
     expect(await repoB.conversations.findById(ids.bCaseConv)).not.toBeNull();
     expect((await repoB.messages.byConversation(ids.bGeneralConv))!.map((m) => m.content)).toEqual(['B secret question']);
+    expect(await repoB.artifacts.findById(ids.bArtifact)).toMatchObject({ caseFileId: ids.bCase, ownerUserId: b.userId, deletedAt: null });
   });
 });

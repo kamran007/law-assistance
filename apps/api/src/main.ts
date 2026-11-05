@@ -8,6 +8,8 @@ import { jwtAuthenticate } from './modules/auth/authenticate';
 import { ConsoleOtpSender } from './modules/auth/otp';
 import { AuthService } from './modules/auth/service';
 import { TokenService } from './modules/auth/tokens';
+import { BullScanQueue } from './modules/documents/queue';
+import { S3DocumentStorage } from './modules/documents/storage';
 import { RedisSectionCache, resilient } from './modules/statutes/cache';
 import { StatutesRepository } from './modules/statutes/repository';
 import { dhakaToday } from './time';
@@ -18,6 +20,9 @@ const { db, close } = createDb(config.DATABASE_URL);
 // One connection for the cache and rate limiting. Commands fail fast instead of queueing while
 // Redis is down; both callers then fall back (cache → MySQL, rate limit → skipped).
 const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false });
+// BullMQ needs its own connection that retries (maxRetriesPerRequest: null) rather than failing fast.
+const queueRedis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
+const scanQueue = new BullScanQueue(queueRedis);
 
 // Staging/production can't boot without keys (packages/config). In local development a missing
 // key gets a throwaway value: tokens and codes then stop working when the process restarts.
@@ -46,6 +51,7 @@ const app = await buildApp(config, {
   },
   cases: { db, authenticate, today: dhakaToday },
   conversations: { db, authenticate },
+  documents: { db, authenticate, storage: S3DocumentStorage.fromConfig(config), queue: scanQueue },
 });
 if (dev && (!config.JWT_PRIVATE_KEY || !config.OTP_HMAC_KEY)) {
   app.log.warn('JWT/OTP keys not set: using throwaway keys; sessions end when the API restarts');
@@ -54,8 +60,10 @@ if (dev && (!config.JWT_PRIVATE_KEY || !config.OTP_HMAC_KEY)) {
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, 'shutting down');
   await app.close();
+  await scanQueue.close();
   await close();
   redis.disconnect();
+  queueRedis.disconnect();
   process.exit(0);
 };
 process.on('SIGINT', () => void shutdown('SIGINT'));
