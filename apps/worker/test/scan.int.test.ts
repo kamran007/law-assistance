@@ -105,7 +105,7 @@ describe('processScanJob', () => {
     const tools = fakeTools({ pages: [longPage('ধারা ৪২০ প্রতারণা'), longPage('FIR No. 12')] });
     const h = harness(tools);
     const job = await upload('application/pdf');
-    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'TEXT_LAYER' });
+    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'TEXT_LAYER', bijoy: false });
     expect(tools.calls.slice(0, 2)).toEqual(['sanitize', 'pdftotext']); // nothing parses before qpdf
     expect(tools.calls).not.toContain('rasterize');
     expect([...h.objects.keys()]).toEqual([job.key.replace('original.pdf', 'sanitized.pdf')]);
@@ -122,7 +122,7 @@ describe('processScanJob', () => {
     const ocr: OcrProvider = { read: async (pages) => pages.map((_, i) => ({ text: `page ${i + 1} এজাহার`, confidence: i ? 0.8 : 0.9 })) };
     const h = harness(tools, ocr);
     const job = await upload('application/pdf');
-    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'OCR' });
+    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'OCR', bijoy: false });
     expect(tools.calls).toContain('rasterize');
     const a = await row(job.artifactId);
     expect(a.ocrConfidence).toBeCloseTo(0.85);
@@ -132,7 +132,7 @@ describe('processScanJob', () => {
   it('extracts DOCX text without OCR', async () => {
     const h = harness(fakeTools());
     const job = await upload('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'DOCX' });
+    expect(await processScanJob(h.deps, job)).toEqual({ status: 'EXTRACTED', method: 'DOCX', bijoy: false });
     expect((await row(job.artifactId)).rawExtractedText).toBe('Bail petition draft text');
   });
 
@@ -144,13 +144,21 @@ describe('processScanJob', () => {
     expect(h.analysis).toEqual([]);
   });
 
-  it('fails Bijoy documents until the converter exists (DATA-11), by text or by font', async () => {
-    const byText = harness(fakeTools({ pages: [longPage('Avgvi †mvbvi evsjv Avwg †Zvgvq fv‡jvevwm')] }));
+  it('converts Bijoy (SutonnyMJ) text to Unicode before analysis (DATA-11), detected by text or by font', async () => {
+    const byText = harness(fakeTools({ pages: [longPage('`Ûwewai 302/34 aviv †gvt Avjx †mvbvi')] }));
     const a = await upload('application/pdf');
-    expect(await processScanJob(byText.deps, a)).toEqual({ status: 'FAILED', code: 'BIJOY_CONVERSION_UNAVAILABLE' });
-    const byFont = harness(fakeTools({ pages: [longPage('abc def')], fonts: ['ABCDEF+SutonnyMJ'] }));
+    expect(await processScanJob(byText.deps, a)).toEqual({ status: 'EXTRACTED', method: 'TEXT_LAYER', bijoy: true });
+    const text = (await row(a.artifactId)).rawExtractedText!;
+    expect(text).toContain('দন্ডবিধির ৩০২/৩৪ ধারা মোঃ আলী সোনার');
+    expect(text).not.toMatch(/[†‡Û]/);
+    expect(byText.analysis).toHaveLength(1);
+    expect(JSON.stringify(byText.logs)).not.toContain('ধারা'); // still no document text in logs
+
+    // The font says SutonnyMJ although the text has none of the typical marks: still converted.
+    const byFont = harness(fakeTools({ pages: [longPage('Avgvi gvgjv')], fonts: ['ABCDEF+SutonnyMJ'] }));
     const b = await upload('application/pdf');
-    expect(await processScanJob(byFont.deps, b)).toEqual({ status: 'FAILED', code: 'BIJOY_CONVERSION_UNAVAILABLE' });
+    expect(await processScanJob(byFont.deps, b)).toEqual({ status: 'EXTRACTED', method: 'TEXT_LAYER', bijoy: true });
+    expect((await row(b.artifactId)).rawExtractedText).toContain('আমার মামলা');
   });
 
   it('reports unusable files with the tool’s code', async () => {

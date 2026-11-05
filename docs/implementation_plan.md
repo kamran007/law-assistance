@@ -156,7 +156,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [ ] **JUD-01** Spike: SCOB index, both list templates (per-issue AD/HD and generic `bulletin_list.php`), 10 sample PDFs across old/new issues and both divisions (text layer vs scanned, English vs Bangla, paragraph and date formats); count judgments per issue · *Output:* `apps/worker/src/scob/README.md` + `scob-source-config.ts` + saved fixtures
 - [ ] **JUD-02** Schema: `judgments`, `judgment_statute_refs`, `judgment_chunks`, `judgment_revisions` (TRD §4.2) + grants for `app_scraper` + outbox event types · *Done when:* migrations apply on an empty DB and the grants test covers the new tables
 - [ ] **JUD-03** Crawler + list parser in `apps/worker/src/scob`: reuse the §6.1 HTTP client, own 1 req/s limiter, robots.txt, snapshots to S3, weekly BullMQ job, `--scob-backfill` CLI (TRD §6A.1–6A.2) · *Depends:* JUD-01, JUD-02 · *Done when:* parser tests pass on both templates' fixtures
-- [ ] **JUD-04** PDF pipeline: hash, `qpdf`, `pdftotext`, Bijoy check, paragraph splitter, metadata rules + verified LLM fallback, `NEEDS_REVIEW` path, revision on changed PDF (TRD §6A.3) · *Depends:* JUD-03 · OCR fallback waits for BE-20; Bijoy conversion waits for DATA-11 (those judgments stay `NEEDS_REVIEW` until then)
+- [ ] **JUD-04** PDF pipeline: hash, `qpdf`, `pdftotext`, Bijoy check, paragraph splitter, metadata rules + verified LLM fallback, `NEEDS_REVIEW` path, revision on changed PDF (TRD §6A.3) · *Depends:* JUD-03 · OCR fallback waits for BE-20 (those judgments stay `NEEDS_REVIEW` until then); Bijoy conversion: `convertBijoyDocument` from DATA-11
 - [ ] **JUD-05** Statute linking: run the section detector + Act dictionary over key words and body → `judgment_statute_refs` · *Depends:* JUD-04, DATA-12 (a first version over key words only can start before DATA-12)
 - [ ] **JUD-06** Judgment chunker + outbox handler → TEI → Qdrant `judgment_chunks` (alias + reindex like DATA-07); backfill all issues · *Depends:* JUD-04, DATA-06 · *Done when:* outbox replay is idempotent (integration test) and EVAL-10 passes
 - [ ] **EVAL-10** Judgment-metadata eval: 50 judgments checked by hand against the PDF (TRD §14.2)
@@ -177,7 +177,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [ ] **BE-20** `OcrProvider` (Google Vision) + `providers` interface · *Depends:* PRE-04
 - [x] **BE-21** Upload flow: presigned PUT URL, `HeadObject` check, magic-byte validation (TRD §8.1, §12.6). `qpdf` sanitization moved to BE-22 (needs the binary in the worker image)
 - [x] **BE-22** BullMQ scan flow stages 1–2: `qpdf` sanitization (from BE-21) + `pdftotext`/`pdftoppm`/`mammoth`/`sharp` pre-processing, Bijoy detection + converter (TRD §8.2)
-- [ ] **DATA-11** Bijoy→Unicode converter in `packages/legal-text` with a test corpus of ≥ 200 strings
+- [x] **DATA-11** Bijoy→Unicode converter in `packages/legal-text` with a test corpus of ≥ 200 strings
 - [x] **DATA-12** Section detector (Bangla/English patterns, letters, `302/34` expansion, Act dictionary, `act_inferred`) — ≥ 300 test strings (TRD §8.4)
 - [ ] **BE-23** Stage 3: `generateObject` FIR extraction with the Zod schema (TRD §8.3)
 - [ ] **BE-24** Stages 4–5: Bangla/English date parser, delay calculation, detector merge, Schedule II join, `NOT_IN_VERIFIED_SCHEDULE` handling

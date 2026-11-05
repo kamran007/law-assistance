@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scoped, type CaseArtifact, type Db } from '@lawassist/db';
-import { looksLikeBijoy } from '@lawassist/legal-text';
+import { convertBijoyDocument, looksLikeBijoy } from '@lawassist/legal-text';
 import { OcrNotConfiguredError, type OcrProvider } from '@lawassist/providers';
 import { ToolError, type DocumentTools } from './tools';
 
@@ -44,7 +44,7 @@ export class ScanFailure extends Error {
   }
 }
 
-export type ScanOutcome = { status: 'EXTRACTED'; method: 'TEXT_LAYER' | 'DOCX' | 'OCR' } | { status: 'FAILED'; code: string } | { status: 'SKIPPED'; reason: string };
+export type ScanOutcome = { status: 'EXTRACTED'; method: 'TEXT_LAYER' | 'DOCX' | 'OCR'; bijoy: boolean } |{ status: 'FAILED'; code: string } | { status: 'SKIPPED'; reason: string };
 
 /** Statuses from which stages 1–2 may (re)run; anything later means the work is already done. */
 const STARTABLE: CaseArtifact['processingStatus'][] = ['UPLOADED', 'OCR'];
@@ -65,14 +65,13 @@ export async function processScanJob(deps: ScanDeps, job: { artifactId: string; 
     const extracted = await extract(deps, artifact, original, dir);
 
     if (!extracted.text.trim()) return fail(repo, job.artifactId, 'UNREADABLE_DOCUMENT');
-    if (looksLikeBijoy({ text: extracted.text, fontNames: extracted.fontNames })) {
-      // The Bijoy → Unicode converter is DATA-11. Until then, say so instead of analysing garbage.
-      return fail(repo, job.artifactId, 'BIJOY_CONVERSION_UNAVAILABLE');
-    }
+    // Legacy SutonnyMJ documents: convert to Unicode before anything reads the text (DATA-11).
+    const bijoy = looksLikeBijoy({ text: extracted.text, fontNames: extracted.fontNames });
+    const text = bijoy ? convertBijoyDocument(extracted.text) : extracted.text;
 
     const stillThere = await repo.artifacts.setProcessing(job.artifactId, {
       processingStatus: 'EXTRACTING',
-      rawExtractedText: extracted.text,
+      rawExtractedText: text,
       ocrConfidence: extracted.confidence,
       pageCount: extracted.pageCount,
       fileSha256,
@@ -80,8 +79,8 @@ export async function processScanJob(deps: ScanDeps, job: { artifactId: string; 
     if (!stillThere) return { status: 'SKIPPED', reason: 'deleted during processing' };
     await deps.analysis.enqueue({ artifactId: job.artifactId, ownerUserId: job.ownerUserId }); // ids only
     // IDs and counts only: never document text (TRD §12.3).
-    deps.log.info({ artifactId: job.artifactId, method: extracted.method, pages: extracted.pageCount, chars: extracted.text.length }, 'scan text extracted');
-    return { status: 'EXTRACTED', method: extracted.method };
+    deps.log.info({ artifactId: job.artifactId, method: extracted.method, bijoy, pages: extracted.pageCount, chars: text.length }, 'scan text extracted');
+    return { status: 'EXTRACTED', method: extracted.method, bijoy };
   } catch (err) {
     if (err instanceof ScanFailure) return fail(repo, job.artifactId, err.code);
     if (err instanceof ToolError) return fail(repo, job.artifactId, err.code);

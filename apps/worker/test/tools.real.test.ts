@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { convertBijoyDocument, looksLikeBijoy } from '@lawassist/legal-text';
 import { CliDocumentTools, MAX_IMAGE_EDGE, run, ToolError } from '../src/scan/tools';
 
 /**
@@ -66,6 +67,25 @@ describe.skipIf(!binaries)('qpdf + Poppler', () => {
     expect(pages[0]).toContain('page one');
     expect(pages[1]).toContain('page two');
     expect(await tools.pdfFontNames(out)).toContain('Helvetica');
+  });
+
+  it('reads a real SutonnyMJ gazette and converts it to Unicode (DATA-11)', async () => {
+    // First 2 pages of the Bangladesh Investment Development Authority Bill 2016 (dpp.gov.bd gazette 16000).
+    const src = join(dir, 'gazette.pdf');
+    const out = join(dir, 'gazette.clean.pdf');
+    await writeFile(src, await readFile(new URL('./fixtures/gazette-2016-bill-sutonnymj.pdf', import.meta.url)));
+    await tools.sanitizePdf(src, out);
+    const pages = await tools.pdfTextPages(out);
+    const fontNames = await tools.pdfFontNames(out);
+    expect(fontNames.some((f) => f.includes('SutonnyMJ'))).toBe(true);
+    const text = pages.join('\n');
+    expect(looksLikeBijoy({ text, fontNames })).toBe(true);
+    const unicode = convertBijoyDocument(text);
+    expect(unicode).toContain('কর্তৃপক্ষ কর্তৃক প্রকাশিত');
+    expect(unicode).toContain('অর্থনৈতিক কর্মকাণ্ডে ব্যবহারের লক্ষ্যে');
+    expect(unicode).toContain('"অনুমোদনপত্র" অর্থ বেসরকারি খাতে কোন শিল্প স্থাপনের বিষয়ে ধারা ১৬ এর');
+    expect(unicode).toContain('মূল্য : টাকা ১৫.০০');
+    expect(unicode).not.toMatch(/[†‡©¨Ö]/);
   });
 
   it('removes embedded files', async () => {
