@@ -178,7 +178,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **BE-21** Upload flow: presigned PUT URL, `HeadObject` check, magic-byte validation (TRD §8.1, §12.6). `qpdf` sanitization moved to BE-22 (needs the binary in the worker image)
 - [x] **BE-22** BullMQ scan flow stages 1–2: `qpdf` sanitization (from BE-21) + `pdftotext`/`pdftoppm`/`mammoth`/`sharp` pre-processing, Bijoy detection + converter (TRD §8.2)
 - [ ] **DATA-11** Bijoy→Unicode converter in `packages/legal-text` with a test corpus of ≥ 200 strings
-- [ ] **DATA-12** Section detector (Bangla/English patterns, letters, `302/34` expansion, Act dictionary, `act_inferred`) — ≥ 300 test strings (TRD §8.4)
+- [x] **DATA-12** Section detector (Bangla/English patterns, letters, `302/34` expansion, Act dictionary, `act_inferred`) — ≥ 300 test strings (TRD §8.4)
 - [ ] **BE-23** Stage 3: `generateObject` FIR extraction with the Zod schema (TRD §8.3)
 - [ ] **BE-24** Stages 4–5: Bangla/English date parser, delay calculation, detector merge, Schedule II join, `NOT_IN_VERIFIED_SCHEDULE` handling
 - [ ] **BE-25** Stage 6: role analyses (Citizen explanation / Lawyer ingredient audit / Judge charge matrix) with pinned sources + citation validation
