@@ -1,0 +1,10 @@
+# Keep build contexts small and never ship local secrets or host-built binaries.
+**/node_modules
+.git
+.env
+.env.*
+!.env.example
+**/coverage
+**/dist
+**/*.log
+docs/*.pdf

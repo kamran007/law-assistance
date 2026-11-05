@@ -285,6 +285,23 @@ export function scoped(db: Db, userId: string) {
       }
     },
 
+    /**
+     * Scan pipeline progress and results (TRD §8.2). Only for a live artifact of this user; returns
+     * false if it was deleted meanwhile, so the pipeline can stop.
+     */
+    async setProcessing(
+      artifactId: string,
+      patch: Partial<
+        Pick<CaseArtifact, 'processingStatus' | 'processingError' | 'rawExtractedText' | 'ocrConfidence' | 'pageCount' | 'fileSha256'>
+      >,
+    ): Promise<boolean> {
+      const [res] = await db
+        .update(caseArtifacts)
+        .set(patch)
+        .where(and(eq(caseArtifacts.artifactId, artifactId), eq(caseArtifacts.ownerUserId, userId), isNull(caseArtifacts.deletedAt)));
+      return res.affectedRows === 1;
+    },
+
     async softDelete(artifactId: string): Promise<boolean> {
       const [res] = await db
         .update(caseArtifacts)

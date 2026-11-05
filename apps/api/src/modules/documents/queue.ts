@@ -1,3 +1,4 @@
+import { SCAN_JOB, SCAN_QUEUE } from '@lawassist/providers';
 import { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 
@@ -5,9 +6,6 @@ import type { Redis } from 'ioredis';
 export interface ScanQueue {
   enqueue(job: { artifactId: string; ownerUserId: string }): Promise<void>;
 }
-
-export const SCAN_QUEUE = 'scan';
-export const SCAN_JOB = 'scan_pipeline';
 
 /**
  * BullMQ producer. The job id is the artifact id, so a retried registration never starts a second

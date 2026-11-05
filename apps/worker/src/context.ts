@@ -2,7 +2,9 @@ import { Redis } from 'ioredis';
 import { pino } from 'pino';
 import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
-import { QdrantChunkIndex, TeiEmbeddingProvider, createQdrantClient, statuteGenerationKey } from '@lawassist/providers';
+import { QdrantChunkIndex, TeiEmbeddingProvider, createQdrantClient, notConfiguredOcr, statuteGenerationKey } from '@lawassist/providers';
+import { S3DocumentObjects } from './scan/objects';
+import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
 import { PoliteHttpClient } from './scrape/http-client';
 import { RedisConditionalCache } from './scrape/redis-conditional-cache';
@@ -40,11 +42,22 @@ export function createWorkerContext() {
   const embedder = new TeiEmbeddingProvider({ url: cfg.TEI_EMBED_URL, model: cfg.EMBEDDING_MODEL });
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
 
+  // Scan pipeline (TRD §8.2): user data, so it runs on the app_worker connection through scoped().
+  const scan = {
+    db,
+    tools: new CliDocumentTools(),
+    // Google Vision arrives with BE-20 (PRE-04); until then OCR-only documents fail clearly.
+    ocr: notConfiguredOcr,
+    objects: S3DocumentObjects.fromConfig(cfg),
+    log,
+  };
+
   return {
     cfg,
     log,
     db,
     scrape,
+    scan,
     qdrant,
     embedder,
     indexer,

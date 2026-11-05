@@ -3,16 +3,23 @@ import { z } from 'zod';
 import { createWorkerContext } from './context';
 import { ensureChunkCollection } from './index/collection';
 import { drainOutbox } from './index/outbox';
+import { SCAN_QUEUE } from '@lawassist/providers';
+import { BullAnalysisQueue } from './scan/objects';
+import { markFailedAfterRetries, processScanJob } from './scan/pipeline';
 import { runScrape } from './scrape/run-scrape';
 
 /**
  * Worker process (TRD §3.1). Queues:
  *   scrape  nightly 02:00 Asia/Dhaka (conditional GET) + weekly full re-crawl Friday 03:00 (TRD §6.1)
  *   outbox  every 15 s: MySQL outbox → TEI embed → Qdrant (TRD §4.4, §6.4)
- * Both run with concurrency 1: the crawl's 1 req/s limit is global, and the outbox has one consumer.
+ *   scan    documents registered by the API: sanitize, extract text → `analysis` queue (TRD §8.2)
+ * scrape and outbox run with concurrency 1: the crawl's 1 req/s limit is global, and the outbox has
+ * one consumer. scan runs 2 at a time (CPU-bound tools).
  */
 export const SCRAPE_QUEUE = 'scrape';
 export const OUTBOX_QUEUE = 'outbox';
+
+const documentJobSchema = z.object({ artifactId: z.uuid(), ownerUserId: z.uuid() });
 
 const scrapeJobSchema = z.object({
   kind: z.enum(['NIGHTLY', 'FULL', 'MANUAL']),
@@ -57,18 +64,34 @@ async function main() {
     lockDuration: 5 * 60_000,
   });
 
+  // Scan pipeline stages 1–2 (TRD §8.2). Jobs come from the API (BE-21) with 3 attempts.
+  const analysis = BullAnalysisQueue.create(connection);
+  const scanWorker = new Worker(
+    SCAN_QUEUE,
+    async (job) => processScanJob({ ...ctx.scan, analysis }, documentJobSchema.parse(job.data)),
+    { connection, concurrency: 2, lockDuration: 5 * 60_000 },
+  );
+  scanWorker.on('failed', (job) => {
+    if (!job) return;
+    const parsed = documentJobSchema.safeParse(job.data);
+    if (parsed.success && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      void markFailedAfterRetries(ctx.db, parsed.data).catch((e: unknown) => ctx.log.error({ jobId: job.id, err: String(e) }, 'could not mark scan failed'));
+    }
+  });
+
   for (const [name, w] of [
     ['scrape', scrapeWorker],
     ['outbox', outboxWorker],
+    ['scan', scanWorker],
   ] as const) {
-    w.on('failed', (job, err) => ctx.log.error({ queue: name, jobId: job?.id, err: err.message }, 'job failed'));
+    w.on('failed', (job, err) => ctx.log.error({ queue: name, jobId: job?.id, attempts: job?.attemptsMade, err: err.message }, 'job failed'));
   }
-  ctx.log.info({ queues: [SCRAPE_QUEUE, OUTBOX_QUEUE] }, 'worker started');
+  ctx.log.info({ queues: [SCRAPE_QUEUE, OUTBOX_QUEUE, SCAN_QUEUE] }, 'worker started');
 
   const shutdown = async () => {
     ctx.log.info({}, 'shutting down');
-    await Promise.all([scrapeWorker.close(), outboxWorker.close()]);
-    await Promise.all([scrapeQueue.close(), outboxQueue.close()]);
+    await Promise.all([scrapeWorker.close(), outboxWorker.close(), scanWorker.close()]);
+    await Promise.all([scrapeQueue.close(), outboxQueue.close(), analysis.close()]);
     await ctx.close();
     process.exit(0);
   };

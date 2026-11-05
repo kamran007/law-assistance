@@ -22,10 +22,15 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Document tools for the scan pipeline tests (same packages as the worker image)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qpdf poppler-utils
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+        env:
+          # tools.real.test.ts fails instead of skipping when qpdf/Poppler are missing.
+          REQUIRE_DOC_TOOLS: '1'
       - name: Integration tests (Testcontainers MySQL)
         run: pnpm test:integration
 
