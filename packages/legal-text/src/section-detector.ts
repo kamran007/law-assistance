@@ -107,6 +107,13 @@ function findActs(text: string): ActMention[] {
   return kept.sort((a, b) => a.start - b.start);
 }
 
+/** The Act a free-text name refers to ("দণ্ডবিধি", "Cr.P.C.", "Narcotics Control Act"), if any. */
+export function resolveActName(name: string | null | undefined): DetectedAct | null {
+  if (!name) return null;
+  const act = findActs(name.normalize('NFC'))[0]?.act;
+  return act ? { key: act.key, bdlawsActId: act.bdlawsActId, name: act.name } : null;
+}
+
 function resolveAct(text: string, start: number, end: number, acts: ActMention[]): ActEntry | null {
   let best: { act: ActEntry; score: number } | null = null;
   for (const m of acts) {
