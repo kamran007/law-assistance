@@ -14,3 +14,4 @@ coverage/
 # Service-account keys (FCM etc.) are secrets
 secrets/
 *firebase-adminsdk*.json
+firebase-service-account*.json

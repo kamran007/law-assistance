@@ -94,7 +94,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 3a. **Relay rewrites requests** (BE-09, `docs/relay-verification.md`): ≈ 17× billed input, `max_tokens` ignored, unknown injected prompt. Dev with invented data only; direct Anthropic key needed before any real document (D10).
 3b. **FIR extraction latency** 13–17 s vs the 6 s SLA for stages 1–5 (TRD §8.2); stage 6 adds ~30 s (citizen) / ~34 s (lawyer, effort high). Stage 5 results are now saved and visible at ANALYZING before stage 6 runs. Remaining options: shorten the extraction summary, or a faster model for extraction (a product decision; the model is not changed without it).
 4. `main` CI fully green since PR #3 (`46856b0`).
-4a. **Firebase project** not created yet: it needs the owner's Google sign-in (no browser access from the dev session). Steps in `docs/firebase-setup.md`; the worker turns push on when `FCM_SERVICE_ACCOUNT_FILE` / `_JSON` is set.
+4a. **Firebase project** `bd-lawassist-dev` created by the owner (2026-11-08); key in `secrets/` (git-ignored), `FCM_SERVICE_ACCOUNT_FILE` set. Verified against FCM: OAuth grant 200, validate-only send accepted the request and rejected only the dummy token. First real push needs the app (MOB-07) to register a device token.
 5. RDS later needs `log_bin_trust_function_creators=1` so migrations can create triggers (noted in `grants.sql`).
 
 ## Decisions made during build
