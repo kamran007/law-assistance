@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+/* Design tokens (Tailwind v4 theme). Bangla text needs a taller line height than Latin. */
+@theme {
+  --font-sans: var(--font-bengali), var(--font-latin), ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: oklch(0.97 0.02 165);
+  --color-brand-100: oklch(0.93 0.04 165);
+  --color-brand-600: oklch(0.5 0.11 165);
+  --color-brand-700: oklch(0.43 0.1 165);
+  --color-brand-900: oklch(0.29 0.06 165);
+}
+
+:root {
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.21 0.01 260);
+  --muted: oklch(0.55 0.01 260);
+  --border: oklch(0.91 0.005 260);
+  --card: oklch(1 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.17 0.01 260);
+    --foreground: oklch(0.95 0.005 260);
+    --muted: oklch(0.7 0.01 260);
+    --border: oklch(0.3 0.01 260);
+    --card: oklch(0.21 0.01 260);
+  }
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html:lang(bn) body {
+  line-height: 1.75;
+}

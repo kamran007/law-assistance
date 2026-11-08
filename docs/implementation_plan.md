@@ -145,7 +145,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **QA-01** **Tenant isolation suite** across every route + route-coverage check in CI (TRD §4.3)
 
 ### Web
-- [ ] **WEB-01** Next.js scaffold, Tailwind, `next-intl` (BN/EN), Noto Sans Bengali, typed API client from `packages/contracts`
+- [x] **WEB-01** Next.js scaffold, Tailwind, `next-intl` (BN/EN), Noto Sans Bengali, typed API client from `packages/contracts`
 - [ ] **WEB-02** Auth screens: language picker, login, OTP, profile setup, credential entry, pending-verification banner (App Flow §3)
 - [ ] **WEB-03** Assistant chat: SSE parser via `fetch` stream, streaming render, citation chips, retry on interrupt, conversation history sidebar (rename/delete) (App Flow §4–5)
 - [ ] **WEB-04** Law Verifier side panel: verbatim text, footnotes, Schedule II strip, version history & diff (Lawyer/Judge) (App Flow §7.1)

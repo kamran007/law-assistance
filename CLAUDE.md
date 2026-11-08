@@ -28,6 +28,8 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 - `pnpm install` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (unit) · `pnpm test:integration` (needs Docker)
 - `docker compose up -d` (add `--profile ml` for the TEI embedding/reranker containers)
 - `pnpm db:generate` (after schema changes) · `pnpm db:migrate`
+- `pnpm openapi` after changing API route schemas (regenerates `packages/contracts`; a test fails on drift)
+- `pnpm dev:web` (Next.js on :3001) · `pnpm --filter @lawassist/web build`
 
 ## Rules that must not be broken
 - **Tenant isolation:** tenant tables (case_files, case_artifacts, artifact_revisions, conversations, messages) are only accessed via `scoped(db, userId)` from `@lawassist/db`. Never import `@lawassist/db/schema` in apps (ESLint blocks it). Another user's resource → 404.
@@ -42,10 +44,12 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 ## Layout
 ```
 apps/api          Fastify API
+apps/web          Next.js 15 web app (App Router, next-intl bn/en, Tailwind v4)
 apps/worker       BullMQ worker: scraper (src/scrape, see README there), vector indexing (src/index),
                   scan pipeline (src/scan; needs qpdf + Poppler, see apps/worker/Dockerfile),
                   analysis stages 3–5 (src/analysis: LLM FIR extraction, dates, sections, Schedule II)
 packages/config   Zod env loader
+packages/contracts  Generated OpenAPI spec + types, typed API client, SSE reader (do not edit schema.ts / openapi.json)
 packages/providers  TEI embedding client, Qdrant chunk index, LLM client (src/llm.ts), queue names,
                   status events (src/artifact-events.ts), FCM push (src/fcm.ts)
 packages/db       Drizzle schema, migrations, scoped repos, grants.sql

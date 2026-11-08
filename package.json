@@ -14,15 +14,19 @@
     "test:integration": "vitest run --project integration",
     "dev:api": "pnpm --filter @lawassist/api dev",
     "db:generate": "pnpm --filter @lawassist/db generate",
-    "db:migrate": "pnpm --filter @lawassist/db migrate"
+    "db:migrate": "pnpm --filter @lawassist/db migrate",
+    "dev:web": "pnpm --filter @lawassist/web dev",
+    "openapi": "pnpm --filter @lawassist/api openapi"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "15.5.29",
     "@testcontainers/mysql": "^12.2.1",
     "@testcontainers/qdrant": "^12.2.1",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "testcontainers": "^12.2.1",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",

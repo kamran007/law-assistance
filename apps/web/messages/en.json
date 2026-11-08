@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "title": "BD-LawAssist",
+    "description": "Legal research for Bangladesh law: ask questions, verify sections, analyse case documents."
+  },
+  "nav": {
+    "brand": "BD-LawAssist",
+    "skip": "Skip to main content"
+  },
+  "language": {
+    "label": "Language",
+    "bn": "বাংলা",
+    "en": "English"
+  },
+  "home": {
+    "title": "Bangladesh law, in plain words",
+    "subtitle": "Answers to legal questions, every claim cited to the statute text.",
+    "apiChecking": "Checking the connection to the server…",
+    "apiDown": "Can't reach the server.",
+    "apiUp": "{count, plural, one {# Act} other {# Acts}} in the law library.",
+    "sections": {
+      "assistant": { "title": "Legal assistant", "body": "Ask a question and get an answer cited to verified sections." },
+      "library": { "title": "Law library", "body": "Find Acts and sections and see their amendment history." },
+      "cases": { "title": "Cases", "body": "Scan an FIR and see its sections and Schedule II details." }
+    },
+    "disclaimer": "This is legal information, not legal advice. Talk to a lawyer before an important decision."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Back to the home page"
+  }
+}

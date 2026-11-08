@@ -1,0 +1,26 @@
+{
+  "name": "@lawassist/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@lawassist/contracts": "workspace:*",
+    "@tanstack/react-query": "5.107.1",
+    "next": "15.5.29",
+    "next-intl": "4.14.9",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "4.3.5"
+  }
+}
