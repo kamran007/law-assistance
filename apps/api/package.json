@@ -30,9 +30,11 @@
     "file-type": "^22.3.0",
     "ioredis": "^6.0.0",
     "jose": "^6.2.15",
+    "nodemailer": "10.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/nodemailer": "8.0.2",
     "openapi-typescript": "7.13.0"
   }
 }

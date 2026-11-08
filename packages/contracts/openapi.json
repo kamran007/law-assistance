@@ -843,6 +843,13 @@
                         "EMAIL"
                       ]
                     },
+                    "delivery": {
+                      "type": "string",
+                      "enum": [
+                        "SENT",
+                        "DEV_CONSOLE"
+                      ]
+                    },
                     "expires_in_s": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -857,6 +864,7 @@
                   "required": [
                     "challenge_id",
                     "channel",
+                    "delivery",
                     "expires_in_s",
                     "resend_after_s"
                   ],

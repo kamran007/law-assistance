@@ -102,14 +102,21 @@ export const authRoutes =
           summary: 'Send a one-time code by SMS or email',
           body: z.object({ contact: z.string().min(3).max(254), language: language.default('BN') }),
           response: {
-            202: z.object({ challenge_id: z.string(), channel: z.enum(['SMS', 'EMAIL']), expires_in_s: z.number().int(), resend_after_s: z.number().int() }),
+            202: z.object({
+              challenge_id: z.string(),
+              channel: z.enum(['SMS', 'EMAIL']),
+              /** DEV_CONSOLE: local development, the code was printed to the API's terminal, not sent. */
+              delivery: z.enum(['SENT', 'DEV_CONSOLE']),
+              expires_in_s: z.number().int(),
+              resend_after_s: z.number().int(),
+            }),
           },
         },
       },
       async (req, reply) => {
-        const { challengeId, channel } = await service.requestOtp(req.body.contact, req.body.language);
+        const { challengeId, channel, delivery } = await service.requestOtp(req.body.contact, req.body.language);
         req.log.info({ channel, challengeId }, 'otp requested');
-        return reply.status(202).send({ challenge_id: challengeId, channel, expires_in_s: OTP_POLICY.ttlSeconds, resend_after_s: OTP_POLICY.resendAfterSeconds });
+        return reply.status(202).send({ challenge_id: challengeId, channel, delivery, expires_in_s: OTP_POLICY.ttlSeconds, resend_after_s: OTP_POLICY.resendAfterSeconds });
       },
     );
 

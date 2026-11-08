@@ -9,3 +9,5 @@ allowBuilds:
   msgpackr-extract: false
   protobufjs: true
   ssh2: false
+minimumReleaseAgeExclude:
+  - nodemailer@10.4.0

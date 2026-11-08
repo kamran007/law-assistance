@@ -14,7 +14,7 @@ export const LANGUAGE_CHOSEN_KEY = 'la.languageChosen';
 
 type Step =
   | { kind: 'contact' }
-  | { kind: 'otp'; challengeId: string; channel: 'SMS' | 'EMAIL'; resendAt: number };
+  | { kind: 'otp'; challengeId: string; channel: 'SMS' | 'EMAIL'; delivery: 'SENT' | 'DEV_CONSOLE'; resendAt: number };
 
 const noSubscribe = () => () => undefined;
 
@@ -70,7 +70,7 @@ export function LoginFlow({ next }: { next?: string | null }) {
     try {
       const data = await unwrap(api.POST('/api/v1/auth/otp/request', { body: { contact: contact.trim(), language: apiLanguage } }));
       setCode('');
-      setStep({ kind: 'otp', challengeId: data.challenge_id, channel: data.channel, resendAt: Date.now() + data.resend_after_s * 1000 });
+      setStep({ kind: 'otp', challengeId: data.challenge_id, channel: data.channel, delivery: data.delivery, resendAt: Date.now() + data.resend_after_s * 1000 });
       setNow(Date.now());
     } catch (err) {
       setError(errorKey(err));
@@ -160,7 +160,13 @@ export function LoginFlow({ next }: { next?: string | null }) {
     <form onSubmit={verify} className="space-y-5" noValidate>
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">{t('otpTitle')}</h1>
-        <p className="text-[var(--muted)]">{t(step.channel === 'SMS' ? 'otpSentSms' : 'otpSentEmail', { contact: contact.trim() })}</p>
+        {step.delivery === 'DEV_CONSOLE' ? (
+          <p role="note" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+            {t('otpDevConsole')}
+          </p>
+        ) : (
+          <p className="text-[var(--muted)]">{t(step.channel === 'SMS' ? 'otpSentSms' : 'otpSentEmail', { contact: contact.trim() })}</p>
+        )}
       </div>
       <Field
         label={t('otpLabel')}

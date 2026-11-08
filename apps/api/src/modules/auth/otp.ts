@@ -44,9 +44,27 @@ export interface OtpMessage {
   language: 'BN' | 'EN';
 }
 
-/** Delivers one-time codes. The SMS/email implementation comes with PRE-05. */
+/**
+ * How a code reached the user: `SENT` by SMS / email, or `DEV_CONSOLE` = only printed to the API's
+ * terminal (local development), so the app can say so instead of "we sent you an email".
+ */
+export type OtpDelivery = 'SENT' | 'DEV_CONSOLE';
+
+/** Delivers one-time codes. Throwing = not delivered (the API answers 503 OTP_DELIVERY_FAILED). */
 export interface OtpSender {
-  send(msg: OtpMessage): Promise<void>;
+  /** Resolving without a value means SENT. */
+  send(msg: OtpMessage): Promise<OtpDelivery | void>;
+}
+
+/** Sends each channel through its own sender; a channel without one fails. */
+export class ChannelOtpSender implements OtpSender {
+  constructor(private readonly senders: Partial<Record<Channel, OtpSender>>) {}
+
+  async send(msg: OtpMessage): Promise<OtpDelivery | void> {
+    const sender = this.senders[msg.channel];
+    if (!sender) throw new Error(`No ${msg.channel} sender configured`);
+    return sender.send(msg);
+  }
 }
 
 /**
@@ -57,7 +75,8 @@ export interface OtpSender {
 export class ConsoleOtpSender implements OtpSender {
   constructor(private readonly write: (line: string) => void = (l) => process.stdout.write(`${l}\n`)) {}
 
-  async send(msg: OtpMessage): Promise<void> {
+  async send(msg: OtpMessage): Promise<OtpDelivery> {
     this.write(`[dev OTP] ${msg.channel} ${msg.to}: ${msg.code}`);
+    return 'DEV_CONSOLE';
   }
 }

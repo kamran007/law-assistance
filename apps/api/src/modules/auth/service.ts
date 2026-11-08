@@ -66,13 +66,14 @@ export class AuthService {
       expiresAt: new Date(now.getTime() + seconds(OTP_POLICY.ttlSeconds)),
       createdAt: now,
     });
+    let delivery: 'SENT' | 'DEV_CONSOLE';
     try {
-      await this.d.sender.send({ channel: contact.channel, to: contact.identifier, code, language });
+      delivery = (await this.d.sender.send({ channel: contact.channel, to: contact.identifier, code, language })) ?? 'SENT';
     } catch {
       await this.d.db.delete(otpChallenges).where(eq(otpChallenges.challengeId, challengeId));
       throw new ApiError(503, 'OTP_DELIVERY_FAILED', 'Could not send the code', 'Please try again');
     }
-    return { challengeId, channel: contact.channel };
+    return { challengeId, channel: contact.channel, delivery };
   }
 
   /** Checks the code; signs the user in, creating the account on first login (role CITIZEN). */

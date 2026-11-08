@@ -5,7 +5,8 @@ import { sql } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 import { buildApp } from './app';
 import { jwtAuthenticate } from './modules/auth/authenticate';
-import { ConsoleOtpSender } from './modules/auth/otp';
+import { ChannelOtpSender, ConsoleOtpSender } from './modules/auth/otp';
+import { SmtpOtpSender } from './modules/auth/otp-email';
 import { AuthService } from './modules/auth/service';
 import { TokenService } from './modules/auth/tokens';
 import { RedisArtifactEventHub, RedisArtifactEventPublisher } from '@lawassist/providers';
@@ -37,6 +38,12 @@ const tokens =
   config.JWT_PRIVATE_KEY && config.JWT_PUBLIC_KEY ? await TokenService.fromPem(config.JWT_PRIVATE_KEY, config.JWT_PUBLIC_KEY) : await TokenService.ephemeral();
 const otpKey = config.OTP_HMAC_KEY ?? randomBytes(32).toString('hex');
 const authenticate = jwtAuthenticate(tokens);
+// OTP delivery: `console` prints codes (development only; config refuses it elsewhere). `smtp`
+// emails them; SMS has no gateway until PRE-05, so SMS codes are printed in development only.
+const otpSender =
+  config.OTP_DELIVERY === 'smtp'
+    ? new ChannelOtpSender({ EMAIL: SmtpOtpSender.fromUrl(config.SMTP_URL!, config.OTP_EMAIL_FROM!), ...(dev ? { SMS: new ConsoleOtpSender() } : {}) })
+    : new ConsoleOtpSender();
 
 const app = await buildApp(config, {
   checkReady: async () => {
@@ -52,7 +59,7 @@ const app = await buildApp(config, {
   },
   auth: {
     // OTP_DELIVERY=console is the only sender until PRE-05; config refuses it outside development.
-    service: new AuthService({ db, tokens, sender: new ConsoleOtpSender(), otpKey }),
+    service: new AuthService({ db, tokens, sender: otpSender, otpKey }),
     authenticate,
     secureCookies: !dev,
   },

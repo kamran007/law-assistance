@@ -52,6 +52,7 @@
     "otpTitle": "Enter the code",
     "otpSentSms": "We sent a 6-digit code by SMS to {contact}.",
     "otpSentEmail": "We sent a 6-digit code by email to {contact}.",
+    "otpDevConsole": "Development mode: no email or SMS was sent. The code is shown in the API server’s terminal.",
     "otpLabel": "6-digit code",
     "verify": "Verify",
     "verifying": "Verifying…",

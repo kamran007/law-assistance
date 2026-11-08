@@ -75,7 +75,7 @@ describe('LoginFlow', () => {
 
   it('new user: contact → code (Bangla digits) → session → profile setup, keeping `next`', async () => {
     localStorage.setItem(LANGUAGE_CHOSEN_KEY, '1');
-    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000001', channel: 'SMS', expires_in_s: 300, resend_after_s: 60 }, { status: 202 });
+    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000001', channel: 'SMS', delivery: 'SENT', expires_in_s: 300, resend_after_s: 60 }, { status: 202 });
     routes['POST /api/v1/auth/otp/verify'] = () => sessionFor(user({ preferred_language: 'EN' }), true);
     renderIn(<LoginFlow next="/cases" />);
 
@@ -98,7 +98,7 @@ describe('LoginFlow', () => {
 
   it('returning user goes to `next` in their saved language; a crafted `next` goes home', async () => {
     localStorage.setItem(LANGUAGE_CHOSEN_KEY, '1');
-    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000002', channel: 'EMAIL', expires_in_s: 300, resend_after_s: 0 }, { status: 202 });
+    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000002', channel: 'EMAIL', delivery: 'SENT', expires_in_s: 300, resend_after_s: 0 }, { status: 202 });
     routes['POST /api/v1/auth/otp/verify'] = () => sessionFor(user({ full_name: 'Rahim', profile_complete: true, preferred_language: 'BN' }), false);
     renderIn(<LoginFlow next="//evil.test" />);
     await userEvent.type(screen.getByLabelText(en.auth.contactLabel), 'r@example.com');
@@ -106,6 +106,17 @@ describe('LoginFlow', () => {
     await userEvent.type(await screen.findByLabelText(en.auth.otpLabel), '123456');
     await userEvent.click(screen.getByRole('button', { name: en.auth.verify }));
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/', { locale: 'bn' }));
+  });
+
+  it('says plainly when the code was only printed to the API terminal (development), not sent', async () => {
+    localStorage.setItem(LANGUAGE_CHOSEN_KEY, '1');
+    routes['POST /api/v1/auth/otp/request'] = () =>
+      Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000004', channel: 'EMAIL', delivery: 'DEV_CONSOLE', expires_in_s: 300, resend_after_s: 60 }, { status: 202 });
+    renderIn(<LoginFlow />);
+    await userEvent.type(screen.getByLabelText(en.auth.contactLabel), 'r@example.com');
+    await userEvent.click(screen.getByRole('button', { name: en.auth.sendCode }));
+    expect((await screen.findByRole('note')).textContent).toBe(en.auth.otpDevConsole);
+    expect(screen.queryByText(/We sent/)).toBeNull();
   });
 
   it('shows the API error in the page language', async () => {
@@ -119,7 +130,7 @@ describe('LoginFlow', () => {
 
   it('a wrong code keeps the user on the code step with a message', async () => {
     localStorage.setItem(LANGUAGE_CHOSEN_KEY, '1');
-    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000003', channel: 'SMS', expires_in_s: 300, resend_after_s: 60 }, { status: 202 });
+    routes['POST /api/v1/auth/otp/request'] = () => Response.json({ challenge_id: '0190a000-0000-7000-8000-000000000003', channel: 'SMS', delivery: 'SENT', expires_in_s: 300, resend_after_s: 60 }, { status: 202 });
     routes['POST /api/v1/auth/otp/verify'] = () => problem(400, 'OTP_INVALID');
     renderIn(<LoginFlow />);
     await userEvent.type(screen.getByLabelText(en.auth.contactLabel), '01711000000');

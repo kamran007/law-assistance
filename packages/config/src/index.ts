@@ -68,7 +68,14 @@ export const envSchema = z.object({
    * development only; it is refused in staging/production. A real SMS/email sender comes with
    * PRE-05 (SMS gateway contract, SES sender domain).
    */
-  OTP_DELIVERY: z.enum(['console']).default('console'),
+  OTP_DELIVERY: z.enum(['console', 'smtp']).default('console'),
+  /**
+   * OTP_DELIVERY=smtp: email codes go out over SMTP, e.g. `smtps://user:app-password@smtp.gmail.com:465`.
+   * SMS has no gateway yet (PRE-05): in development SMS codes are still printed, elsewhere they fail.
+   */
+  SMTP_URL: z.preprocess(emptyToUndefined, z.string().url().refine((u) => u.startsWith('smtp://') || u.startsWith('smtps://'), 'SMTP_URL must be smtp:// or smtps://').optional()),
+  /** Sender address, e.g. `BD-LawAssist <no-reply@example.com>`. */
+  OTP_EMAIL_FROM: z.preprocess(emptyToUndefined, z.string().min(3).optional()),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
@@ -90,6 +97,10 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     throw new ConfigError(parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`));
   }
   const cfg = parsed.data;
+  if (cfg.OTP_DELIVERY === 'smtp') {
+    const missing = (['SMTP_URL', 'OTP_EMAIL_FROM'] as const).filter((k) => !cfg[k]);
+    if (missing.length) throw new ConfigError(missing.map((k) => `${k}: required when OTP_DELIVERY=smtp`));
+  }
   if (cfg.NODE_ENV === 'staging' || cfg.NODE_ENV === 'production') {
     const missing = REQUIRED_IN_DEPLOYED_ENVS.filter((k) => !cfg[k]);
     if (missing.length) throw new ConfigError(missing.map((k) => `${k}: required in ${cfg.NODE_ENV}`));

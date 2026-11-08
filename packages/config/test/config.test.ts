@@ -37,6 +37,15 @@ describe('loadConfig', () => {
     expect(loadConfig(base).OTP_DELIVERY).toBe('console');
   });
 
+  it('OTP_DELIVERY=smtp needs SMTP_URL (smtp/smtps) and OTP_EMAIL_FROM, and is allowed in production', () => {
+    expect(() => loadConfig({ ...base, OTP_DELIVERY: 'smtp' })).toThrow(/SMTP_URL: required when OTP_DELIVERY=smtp/);
+    expect(() => loadConfig({ ...base, OTP_DELIVERY: 'smtp', SMTP_URL: 'https://mail.example', OTP_EMAIL_FROM: 'a@b.c' })).toThrow(/SMTP_URL/);
+    const smtp = { OTP_DELIVERY: 'smtp', SMTP_URL: 'smtps://u:p@smtp.example.com:465', OTP_EMAIL_FROM: 'BD-LawAssist <no-reply@example.com>' };
+    expect(loadConfig({ ...base, ...smtp }).OTP_DELIVERY).toBe('smtp');
+    const secrets = { ANTHROPIC_API_KEY: 'k', JWT_PRIVATE_KEY: 'p', JWT_PUBLIC_KEY: 'q', S3_SSE: 'aws:kms', OTP_HMAC_KEY: 'x'.repeat(32) };
+    expect(loadConfig({ ...base, ...secrets, ...smtp, NODE_ENV: 'production' }).OTP_DELIVERY).toBe('smtp');
+  });
+
   it('never includes secret values in error messages', () => {
     const secret = 'sk-super-secret-value';
     try {

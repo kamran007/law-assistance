@@ -331,6 +331,8 @@ export type paths = {
                             challenge_id: string;
                             /** @enum {string} */
                             channel: "SMS" | "EMAIL";
+                            /** @enum {string} */
+                            delivery: "SENT" | "DEV_CONSOLE";
                             expires_in_s: number;
                             resend_after_s: number;
                         };

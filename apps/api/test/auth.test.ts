@@ -61,6 +61,10 @@ describe('one-time codes and refresh tokens', () => {
     await new ConsoleOtpSender((l) => lines.push(l)).send({ channel: 'SMS', to: '+8801712345678', code: '123456', language: 'BN' });
     expect(lines).toEqual(['[dev OTP] SMS +8801712345678: 123456']);
   });
+
+  it('the console sender reports DEV_CONSOLE, so the app does not claim the code was sent', async () => {
+    expect(await new ConsoleOtpSender(() => undefined).send({ channel: 'EMAIL', to: 'a@example.com', code: '123456', language: 'EN' })).toBe('DEV_CONSOLE');
+  });
 });
 
 describe('TokenService (ES256)', () => {
