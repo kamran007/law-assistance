@@ -14,6 +14,9 @@ export const KNOWN_ERRORS = [
   'CREDENTIAL_PENDING',
   'ROLE_LOCKED',
   'VALIDATION_FAILED',
+  'OFFENSE_DATE_IN_FUTURE',
+  'VERSION_CONFLICT',
+  'NOT_FOUND',
   'NETWORK',
 ] as const;
 export type ErrorKey = (typeof KNOWN_ERRORS)[number] | 'generic';

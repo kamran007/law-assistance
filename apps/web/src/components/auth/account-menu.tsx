@@ -19,6 +19,9 @@ export function AccountMenu() {
   }
   return (
     <div className="flex items-center gap-3 text-sm">
+      <Link href="/cases" className="font-medium text-brand-700 hover:underline">
+        {t('cases')}
+      </Link>
       <span className="hidden max-w-40 truncate sm:inline" title={auth.user.full_name}>
         {auth.user.full_name || auth.user.contact}
       </span>

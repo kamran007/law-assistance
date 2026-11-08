@@ -7,7 +7,8 @@
     "brand": "BD-LawAssist",
     "skip": "Skip to main content",
     "signIn": "Sign in",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "cases": "Cases"
   },
   "language": {
     "label": "Language",
@@ -107,6 +108,86 @@
     "ACCOUNT_DISABLED": "This account is disabled.",
     "CREDENTIAL_PENDING": "Your details are already waiting for verification.",
     "ROLE_LOCKED": "Your role is already set; contact support to change it.",
-    "VALIDATION_FAILED": "Please check the form: some fields are not filled in correctly."
+    "VALIDATION_FAILED": "Please check the form: some fields are not filled in correctly.",
+    "OFFENSE_DATE_IN_FUTURE": "The offense date can't be in the future.",
+    "VERSION_CONFLICT": "This case was changed somewhere else. The latest details are shown; please make your change again.",
+    "NOT_FOUND": "Not found."
+  },
+  "cases": {
+    "title": "My cases",
+    "workspace": "Case",
+    "new": "New case",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load your cases.",
+    "retry": "Try again",
+    "emptyTitle": "No cases yet",
+    "emptyBody": "Create a case to keep its FIR and other documents in one place.",
+    "untitled": "Untitled case",
+    "updated": "Last changed {date}",
+    "notFound": "Case not found.",
+    "backToList": "← All cases",
+    "tabsLabel": "Case sections",
+    "tabs": {
+      "overview": "Overview",
+      "documents": "Documents",
+      "drafts": "Drafts",
+      "conversation": "Conversation"
+    },
+    "fields": {
+      "caseNumber": "Case number",
+      "court": "Court / Thana",
+      "offenseDate": "Alleged offense date",
+      "documents": "Documents",
+      "updated": "Last changed"
+    },
+    "edit": "Edit details",
+    "delete": "Delete case",
+    "deleteConfirmTitle": "Delete this case?",
+    "deleteConfirmBody": "All of this case's documents, drafts and its conversation will be deleted. This can't be undone.",
+    "deleteConfirm": "Yes, delete",
+    "form": {
+      "title": "Title",
+      "titleHint": "A name for yourself, e.g. \"Rahim v. State\".",
+      "caseNumber": "Case number",
+      "caseNumberHint": "e.g. \"G.R. Case No. 412/2026\" (optional).",
+      "court": "Court or Thana",
+      "offenseDate": "Alleged offense date",
+      "offenseDateHint": "If set, answers use the law in force on that date.",
+      "create": "Create case",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "documents": {
+      "loading": "Loading documents…",
+      "loadFailed": "Couldn't load the documents.",
+      "empty": "No documents in this case yet. Scanning and upload are coming next.",
+      "status": {
+        "UPLOADED": "Uploaded",
+        "OCR": "Reading text",
+        "EXTRACTING": "Extracting details",
+        "SCHEDULE_LOOKUP": "Checking Schedule II",
+        "ANALYZING": "Analysing",
+        "READY": "Ready",
+        "FAILED": "Failed"
+      },
+      "types": {
+        "FIR_SCAN": "FIR",
+        "CHARGE_SHEET": "Charge sheet",
+        "SEIZURE_LIST": "Seizure list",
+        "COURT_ORDER": "Court order",
+        "COURT_ORDER_NOTE": "Court order note",
+        "VOICE_DICTATION_DRAFT": "Dictation draft",
+        "GD_DRAFT": "GD draft"
+      }
+    },
+    "drafts": {
+      "empty": "Drafts (dictated or typed) are coming soon."
+    },
+    "conversation": {
+      "loading": "Loading the conversation…",
+      "loadFailed": "Couldn't load the conversation.",
+      "ready": "This case's own conversation is ready, kept apart from other cases and general chats. Chat is coming soon."
+    }
   }
 }
