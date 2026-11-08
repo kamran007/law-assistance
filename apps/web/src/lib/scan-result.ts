@@ -33,7 +33,7 @@ export interface AnalysedSection {
   key: string;
   section: string;
   subsection: string | null;
-  act: { key: string; name: string } | null;
+  act: { key: string; name: string; bdlawsActId: number } | null;
   actInferred: boolean;
   source: 'DETECTOR' | 'DETECTOR_AND_LLM' | 'LLM_QUOTE_IN_TEXT' | 'USER_CORRECTED';
   scheduleStatus: 'VERIFIED' | 'NOT_IN_VERIFIED_SCHEDULE';

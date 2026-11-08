@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation';
 import { isStatus } from '@/lib/cases';
 import { errorKey } from '@/lib/problem';
 import { LOW_OCR_CONFIDENCE, openOriginal, useArtifactDetail, useCorrectArtifact, useReanalyze, type RoleAnalysis, type StoredAnalysis } from '@/lib/scan-result';
+import { VerifierProvider } from '@/components/verifier/verifier-panel';
 import { CorrectionsForm } from './corrections-form';
 import { FirDetails } from './fir-details';
 import { RoleAnalysisBlock } from './role-analysis';
@@ -46,7 +47,11 @@ export function ScanResult({ caseId, artId }: { caseId: string; artId: string })
   const needsReanalysis = analysis?.corrections?.needsReanalysis === true;
   const actionError = correct.error ?? reanalyze.error;
 
+  // Point-in-time law for the verifier: the occurrence date (Lawyers / Judges; ignored for Citizens).
+  const lawDate = analysis?.occurrence?.date ?? null;
+
   return (
+    <VerifierProvider>
     <div className="space-y-8">
       <div className="space-y-1">
         <Link href={`/cases/${caseId}?tab=documents`} className="text-sm text-brand-700 underline">
@@ -127,14 +132,14 @@ export function ScanResult({ caseId, artId }: { caseId: string; artId: string })
             <h2 id="sections-title" className="text-lg font-semibold">
               {t('sections.title')}
             </h2>
-            <SectionsTable sections={analysis.sections ?? []} scheduleDate={analysis.scheduleDate} />
+            <SectionsTable sections={analysis.sections ?? []} scheduleDate={analysis.scheduleDate} lawDate={lawDate} />
           </section>
 
           <section aria-labelledby="analysis-title" className="space-y-3">
             <h2 id="analysis-title" className="text-lg font-semibold">
               {t('analysis.title')}
             </h2>
-            <RoleAnalysisBlock analysis={role} sections={analysis.sections ?? []} processing={processing} />
+            <RoleAnalysisBlock analysis={role} sections={analysis.sections ?? []} processing={processing} lawDate={lawDate} />
           </section>
 
           <p className="rounded-lg border border-dashed border-[var(--border)] p-3 text-sm text-[var(--muted)]">{t('askSoon')}</p>
@@ -143,5 +148,6 @@ export function ScanResult({ caseId, artId }: { caseId: string; artId: string })
         !processing && status !== 'FAILED' && <p className="text-sm text-[var(--muted)]">{t('noAnalysis')}</p>
       )}
     </div>
+    </VerifierProvider>
   );
 }

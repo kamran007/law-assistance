@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useOpenVerifier } from '@/components/verifier/verifier-panel';
 import type { AnalysedSection } from '@/lib/scan-result';
 
 /**
@@ -8,8 +9,9 @@ import type { AnalysedSection } from '@/lib/scan-result';
  * the verified schedule table the worker joined; a section without a verified row says so and
  * shows no status at all (FR-B3: never an AI-guessed bail or cognizance status).
  */
-export function SectionsTable({ sections, scheduleDate }: { sections: AnalysedSection[]; scheduleDate: string }) {
+export function SectionsTable({ sections, scheduleDate, lawDate }: { sections: AnalysedSection[]; scheduleDate: string; lawDate?: string | null }) {
   const t = useTranslations('scan.sections');
+  const openVerifier = useOpenVerifier();
   if (sections.length === 0) return <p className="text-sm text-[var(--muted)]">{t('none')}</p>;
   const yesNo = (v: boolean) => (v ? t('yes') : t('no'));
   return (
@@ -33,7 +35,13 @@ export function SectionsTable({ sections, scheduleDate }: { sections: AnalysedSe
               return (
                 <tr key={`${s.act?.key ?? '?'}:${s.key}:${s.subsection ?? ''}`}>
                   <th scope="row" className="px-3 py-2 text-left font-medium">
-                    {label}
+                    {s.act ? (
+                      <button type="button" onClick={() => openVerifier({ actId: s.act!.bdlawsActId, sec: s.key, asOf: lawDate ?? null })} className="text-left text-brand-700 underline">
+                        {label}
+                      </button>
+                    ) : (
+                      label
+                    )}
                     {s.actInferred && <span className="block text-xs font-normal text-[var(--muted)]">{t('actInferred')}</span>}
                     {s.source === 'USER_CORRECTED' && <span className="block text-xs font-normal text-[var(--muted)]">{t('userCorrected')}</span>}
                   </th>

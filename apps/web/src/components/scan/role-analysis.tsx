@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useOpenVerifier } from '@/components/verifier/verifier-panel';
 import type { AnalysedSection, CitizenContent, JudgeContent, LawyerContent, RoleAnalysis } from '@/lib/scan-result';
 
 type Sources = Extract<RoleAnalysis, { status: 'READY' }>['sources'];
@@ -10,8 +11,9 @@ type Sources = Extract<RoleAnalysis, { status: 'READY' }>['sources'];
  * the section version the server validated it against (TRD §7.4); points without a valid citation
  * were already dropped server-side.
  */
-export function RoleAnalysisBlock({ analysis, sections, processing }: { analysis: RoleAnalysis | null; sections: AnalysedSection[]; processing: boolean }) {
+export function RoleAnalysisBlock({ analysis, sections, processing, lawDate }: { analysis: RoleAnalysis | null; sections: AnalysedSection[]; processing: boolean; lawDate?: string | null }) {
   const t = useTranslations('scan.analysis');
+  const openVerifier = useOpenVerifier();
   if (!analysis) return <p role="status" className="text-sm text-[var(--muted)]">{processing ? t('preparing') : t('none')}</p>;
   if (analysis.status === 'UNAVAILABLE') return <p className="text-sm text-[var(--muted)]">{t('unavailable')}</p>;
   if (analysis.status === 'FAILED') return <p role="alert" className="text-sm text-red-800 dark:text-red-200">{t('failed')}</p>;
@@ -20,7 +22,11 @@ export function RoleAnalysisBlock({ analysis, sections, processing }: { analysis
     const s = sections.find((x) => `${x.act?.key ?? 'UNKNOWN_ACT'}:${x.key}` === ref);
     return s ? t('ref', { act: s.act?.name ?? '', section: s.section }) : ref;
   };
-  const cite = (ids: number[]) => <Citations ids={ids} sources={analysis.sources} name={name} />;
+  const openRef = (ref: string) => {
+    const s = sections.find((x) => `${x.act?.key ?? 'UNKNOWN_ACT'}:${x.key}` === ref);
+    if (s?.act) openVerifier({ actId: s.act.bdlawsActId, sec: s.key, asOf: lawDate ?? null });
+  };
+  const cite = (ids: number[]) => <Citations ids={ids} sources={analysis.sources} name={name} onOpen={openRef} />;
 
   return (
     <div className="space-y-6">
@@ -35,16 +41,22 @@ export function RoleAnalysisBlock({ analysis, sections, processing }: { analysis
 
 type Cite = (ids: number[]) => React.ReactNode;
 
-function Citations({ ids, sources, name }: { ids: number[]; sources: Sources; name: (ref: string) => string }) {
+function Citations({ ids, sources, name, onOpen }: { ids: number[]; sources: Sources; name: (ref: string) => string; onOpen: (ref: string) => void }) {
   const t = useTranslations('scan.analysis');
   const known = ids.map((n) => sources.find((s) => s.n === n)).filter((s): s is Sources[number] => !!s);
   if (known.length === 0) return null;
   return (
     <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
       {known.map((s) => (
-        <span key={s.n} title={t('citationTitle', { version: s.versionNumber })} className="rounded bg-brand-100 px-1.5 py-0.5 text-[11px] font-medium text-brand-900 dark:bg-brand-900 dark:text-brand-100">
+        <button
+          type="button"
+          key={s.n}
+          title={t('citationTitle', { version: s.versionNumber })}
+          onClick={() => onOpen(s.sectionRef)}
+          className="rounded bg-brand-100 px-1.5 py-0.5 text-[11px] font-medium text-brand-900 hover:underline dark:bg-brand-900 dark:text-brand-100"
+        >
           [{s.n}] {name(s.sectionRef)}
-        </span>
+        </button>
       ))}
     </span>
   );
