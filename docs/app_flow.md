@@ -140,6 +140,8 @@ The **right panel** (`[Law Verifier]`) opens whenever a citation is clicked, any
 - The role cannot be changed by the user after setup. Changing it requires re-verification through an admin. ⚠ Assumption
 - JWT expiry triggers a silent refresh. If refresh fails, the user returns to `[Welcome / Login]` and any unsaved draft is kept locally (see §13).
 
+**As built (WEB-02, web):** the language picker is shown on the first visit to `/login` (remembered per browser); the locale is in the URL (`/bn`, `/en`) and, once signed in, the account's `preferred_language` wins and language switches are saved to it. Login and OTP are one screen (`/login`), Profile Setup is `/onboarding` (name + role; credential for Lawyer / Judge). Pages that need a session send signed-out users to `/login?next=…` and back. The access token is kept in memory and refreshed 60 s before expiry from the HttpOnly refresh cookie.
+
 ---
 
 ## 4. Home: Legal Assistant Screen

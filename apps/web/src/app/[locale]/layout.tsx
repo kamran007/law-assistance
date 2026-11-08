@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { AccountMenu } from '@/components/auth/account-menu';
+import { AuthProvider } from '@/components/auth/auth-provider';
+import { VerificationBanner } from '@/components/auth/verification-banner';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { Providers } from '@/components/providers';
 import { Link } from '@/i18n/navigation';
@@ -40,6 +43,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <body className="min-h-dvh font-sans antialiased">
         <NextIntlClientProvider>
           <Providers>
+            <AuthProvider>
             <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded focus:bg-white focus:px-3 focus:py-2">
               {t('skip')}
             </a>
@@ -48,12 +52,17 @@ export default async function LocaleLayout({ children, params }: { children: Rea
                 <Link href="/" className="text-lg font-semibold text-brand-700">
                   {t('brand')}
                 </Link>
-                <LanguageSwitcher />
+                <div className="flex items-center gap-3">
+                  <LanguageSwitcher />
+                  <AccountMenu />
+                </div>
               </div>
             </header>
+            <VerificationBanner />
             <main id="main" className="mx-auto max-w-6xl px-4 py-8">
               {children}
             </main>
+            </AuthProvider>
           </Providers>
         </NextIntlClientProvider>
       </body>

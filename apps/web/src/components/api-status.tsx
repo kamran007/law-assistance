@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { api } from '@/lib/api';
+import { api, unwrap } from '@/lib/api';
 
 /** Shows that the typed client reaches the API: number of Acts in the law library. */
 export function ApiStatus() {
@@ -10,9 +10,7 @@ export function ApiStatus() {
   const { data, isError, isPending } = useQuery({
     queryKey: ['statutes', 'count'],
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/v1/statutes', { params: { query: { limit: 1 } } });
-      if (error || !data) throw new Error('statutes unavailable');
-      return data.total;
+      return (await unwrap(api.GET('/api/v1/statutes', { params: { query: { limit: 1 } } }))).total;
     },
   });
   const text = isPending ? t('apiChecking') : isError ? t('apiDown') : t('apiUp', { count: data });

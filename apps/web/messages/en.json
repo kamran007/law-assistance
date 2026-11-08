@@ -5,7 +5,9 @@
   },
   "nav": {
     "brand": "BD-LawAssist",
-    "skip": "Skip to main content"
+    "skip": "Skip to main content",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
   },
   "language": {
     "label": "Language",
@@ -19,14 +21,91 @@
     "apiDown": "Can't reach the server.",
     "apiUp": "{count, plural, one {# Act} other {# Acts}} in the law library.",
     "sections": {
-      "assistant": { "title": "Legal assistant", "body": "Ask a question and get an answer cited to verified sections." },
-      "library": { "title": "Law library", "body": "Find Acts and sections and see their amendment history." },
-      "cases": { "title": "Cases", "body": "Scan an FIR and see its sections and Schedule II details." }
+      "assistant": {
+        "title": "Legal assistant",
+        "body": "Ask a question and get an answer cited to verified sections."
+      },
+      "library": {
+        "title": "Law library",
+        "body": "Find Acts and sections and see their amendment history."
+      },
+      "cases": {
+        "title": "Cases",
+        "body": "Scan an FIR and see its sections and Schedule II details."
+      }
     },
     "disclaimer": "This is legal information, not legal advice. Talk to a lawyer before an important decision."
   },
   "notFound": {
     "title": "Page not found",
     "home": "Back to the home page"
+  },
+  "auth": {
+    "chooseLanguage": "Choose your language",
+    "title": "Sign in",
+    "subtitle": "We'll send a code to your mobile number or email. New here? Your account is created automatically.",
+    "contactLabel": "Mobile number or email",
+    "contactPlaceholder": "017XXXXXXXX or name@example.com",
+    "contactHint": "Bangla or English digits both work.",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "otpTitle": "Enter the code",
+    "otpSentSms": "We sent a 6-digit code by SMS to {contact}.",
+    "otpSentEmail": "We sent a 6-digit code by email to {contact}.",
+    "otpLabel": "6-digit code",
+    "verify": "Verify",
+    "verifying": "Verifying…",
+    "changeContact": "Change number/email",
+    "resend": "Send a new code",
+    "resendIn": "You can resend in {seconds} s",
+    "checkingSession": "Loading…"
+  },
+  "onboarding": {
+    "title": "Set up your profile",
+    "subtitle": "Tell us your name and who you are; answers are tailored to it.",
+    "nameLabel": "Full name",
+    "roleLabel": "Who are you?",
+    "roles": {
+      "CITIZEN": {
+        "title": "Citizen",
+        "body": "Legal information in plain words"
+      },
+      "LAWYER": {
+        "title": "Lawyer",
+        "body": "Professional tools after Bar Council verification"
+      },
+      "JUDGE": {
+        "title": "Judge",
+        "body": "Professional tools after Judicial ID verification"
+      }
+    },
+    "roleLocked": "You can't change this yourself later; a change needs verification again.",
+    "barCouncilLabel": "Bar Council enrollment number",
+    "judicialIdLabel": "Judicial ID",
+    "credentialHint": "Until it is verified you can use all Citizen features.",
+    "continue": "Continue",
+    "saving": "Saving…"
+  },
+  "banner": {
+    "barCouncil": "Bar Council number",
+    "judicialId": "Judicial ID",
+    "pending": "Your {credential} is being verified. Professional tools will unlock once approved.",
+    "rejected": "Your {credential} couldn't be verified. You can keep using Citizen features; contact support for help."
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again in a moment.",
+    "NETWORK": "Can't reach the server. Check your connection and try again.",
+    "INVALID_CONTACT": "Enter a valid Bangladeshi mobile number or email address.",
+    "OTP_INVALID": "That code isn't right.",
+    "OTP_EXPIRED": "The code has expired. Send a new one.",
+    "OTP_TOO_MANY_ATTEMPTS": "Too many wrong codes. Send a new one.",
+    "OTP_RESEND_TOO_SOON": "Please wait a moment before asking for another code.",
+    "OTP_RATE_LIMITED": "Too many codes requested. Try again later.",
+    "OTP_DELIVERY_FAILED": "We couldn't send the code. Try again in a moment.",
+    "RATE_LIMITED": "Too many requests. Try again in a little while.",
+    "ACCOUNT_DISABLED": "This account is disabled.",
+    "CREDENTIAL_PENDING": "Your details are already waiting for verification.",
+    "ROLE_LOCKED": "Your role is already set; contact support to change it.",
+    "VALIDATION_FAILED": "Please check the form: some fields are not filled in correctly."
   }
 }

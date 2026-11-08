@@ -25,7 +25,7 @@ Node.js 22+ / TypeScript 6 · Fastify 5 + Zod 4 · MySQL 8.4 (Drizzle ORM) · Qd
 AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANTHROPIC_API_KEY` from env only.
 
 ## Commands
-- `pnpm install` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (unit) · `pnpm test:integration` (needs Docker)
+- `pnpm install` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (unit + web jsdom) · `pnpm test:integration` (needs Docker)
 - `docker compose up -d` (add `--profile ml` for the TEI embedding/reranker containers)
 - `pnpm db:generate` (after schema changes) · `pnpm db:migrate`
 - `pnpm openapi` after changing API route schemas (regenerates `packages/contracts`; a test fails on drift)

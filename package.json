@@ -10,7 +10,7 @@
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",
-    "test": "vitest run --project unit",
+    "test": "vitest run --project unit --project web",
     "test:integration": "vitest run --project integration",
     "dev:api": "pnpm --filter @lawassist/api dev",
     "db:generate": "pnpm --filter @lawassist/db generate",
