@@ -292,7 +292,7 @@ export function scoped(db: Db, userId: string) {
     async setProcessing(
       artifactId: string,
       patch: Partial<
-        Pick<CaseArtifact, 'processingStatus' | 'processingError' | 'rawExtractedText' | 'ocrConfidence' | 'pageCount' | 'fileSha256' | 'structuredAnalysis'>
+        Pick<CaseArtifact, 'processingStatus' | 'processingError' | 'rawExtractedText' | 'ocrConfidence' | 'pageCount' | 'fileSha256' | 'structuredAnalysis' | 'roleAnalysis'>
       >,
     ): Promise<boolean> {
       const [res] = await db

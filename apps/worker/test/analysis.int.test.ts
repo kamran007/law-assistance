@@ -1,20 +1,24 @@
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
-import { createDb, crpcScheduleMetadata, newId, runMigrations, scoped, statutes, users, type CaseArtifact, type Db } from '@lawassist/db';
+import { createDb, crpcScheduleMetadata, newId, runMigrations, scoped, statutes, statuteSections, users, type CaseArtifact, type Db } from '@lawassist/db';
 import { CircuitBreaker, LlmNotConfiguredError, LlmRefusalError, type LlmClient, type StructuredRequest } from '@lawassist/providers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FirExtraction } from '../src/analysis/extract';
-import { processAnalysisJob, type StoredAnalysis } from '../src/analysis/job';
+import { processAnalysisJob, type RoleAnalysisRecord, type StoredAnalysis } from '../src/analysis/job';
 
 /**
- * Analysis queue consumer (BE-23 + BE-24) against MySQL 8.4 (Testcontainers, needs Docker) with a
- * fake LLM: status flow, stored structured_analysis, failure codes, tenant scoping, no text in logs.
- * The live model is exercised by extract.live.test.ts (opt-in).
+ * Analysis queue consumer (BE-23, BE-24, BE-25) against MySQL 8.4 (Testcontainers, needs Docker)
+ * with a fake LLM: status flow EXTRACTING → SCHEDULE_LOOKUP → ANALYZING → READY, stored
+ * structured_analysis and role_analysis, failure codes, resume after outage, tenant scoping, no text
+ * in logs. The live model is exercised by extract.live.test.ts (opt-in).
  */
 let container: StartedMySqlContainer;
 let db: Db;
 let close: () => Promise<void>;
-let owner = '';
-let caseId = '';
+let citizen = '';
+let lawyer = '';
+const cases: Record<string, string> = {};
+const penal = newId();
+const s323 = newId();
 
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.4')
@@ -25,11 +29,31 @@ beforeAll(async () => {
   const url = `mysql://root:root@${container.getHost()}:${container.getPort()}/lawassist`;
   await runMigrations(url);
   ({ db, close } = createDb(url, { connectionLimit: 5 }));
-  owner = newId();
-  await db.insert(users).values({ userId: owner, fullName: 'Owner', contactIdentifier: 'owner@example.com' });
-  caseId = (await scoped(db, owner).caseFiles.create({ title: 'FIR' }, { withConversation: false })).caseFileId;
-  const penal = newId();
+  citizen = newId();
+  lawyer = newId();
+  await db.insert(users).values([
+    { userId: citizen, fullName: 'Citizen', contactIdentifier: 'citizen@example.com' },
+    { userId: lawyer, fullName: 'Lawyer', contactIdentifier: 'lawyer@example.com', role: 'LAWYER', requestedRole: 'LAWYER', verificationStatus: 'VERIFIED', preferredLanguage: 'EN' },
+  ]);
+  cases[citizen] = (await scoped(db, citizen).caseFiles.create({ title: 'FIR' }, { withConversation: false })).caseFileId;
+  cases[lawyer] = (await scoped(db, lawyer).caseFiles.create({ title: 'FIR' }, { withConversation: false })).caseFileId;
+
   await db.insert(statutes).values({ statuteId: penal, bdlawsActId: 11, titleEn: 'The Penal Code, 1860', language: 'EN', sourceUrl: 'http://bdlaws.minlaw.gov.bd/act-print-11.html' });
+  await db.insert(statuteSections).values({
+    sectionId: s323,
+    statuteId: penal,
+    sectionNumber: '323',
+    normalizedSectionKey: '323',
+    marginalHeading: 'Punishment for voluntarily causing hurt',
+    contentBody: 'Whoever, except in the case provided for by section 334, voluntarily causes hurt, shall be punished … (test text)',
+    amendmentFootnotes: [],
+    contentHash: 'a'.repeat(64),
+    footnotesHash: 'b'.repeat(64),
+    versionNumber: 1,
+    isCurrent: true,
+    validFrom: '1860-10-06',
+    validFromSource: 'ENACTMENT_DATE',
+  });
   await db.insert(crpcScheduleMetadata).values({
     scheduleId: newId(),
     statuteId: penal,
@@ -73,7 +97,21 @@ const EXTRACTION: FirExtraction = {
   field_confidence: { police_station: 'HIGH', fir_number: 'HIGH', occurrence_datetime: 'HIGH', reported_datetime: 'HIGH', informant: 'HIGH', accused: 'HIGH', cited_sections: 'HIGH' },
 };
 
-function fakeLlm(behaviour: 'ok' | 'refuse' | 'unconfigured' | 'outage'): LlmClient & { calls: StructuredRequest<unknown>[] } {
+const ROLE_OUTPUT: Record<string, unknown> = {
+  citizen_analysis: {
+    summary: 'বাদীকে মারপিটের অভিযোগে মামলা।',
+    sections: [{ section_ref: 'PENAL_CODE:323', plain_explanation: 'ইচ্ছাকৃতভাবে আঘাত করা।', source_ids: [1] }],
+    next_steps: [{ step: 'এজাহারের কপি সংগ্রহ করুন।', source_ids: [] }],
+  },
+  lawyer_analysis: {
+    sections: [{ section_ref: 'PENAL_CODE:323', ingredients: [{ ingredient: 'voluntarily causes hurt', status: 'ALLEGED', evidence_in_fir: 'বাদী রহিমকে মারপিট করে', source_ids: [1, 5] }] }],
+    delay: { assessment: 'UNEXPLAINED', note: 'No reason given for the 12.5 h delay.', evidence_in_fir: null },
+    grounds: [{ kind: 'BAIL', ground: 'Simple hurt only; no weapon alleged.', source_ids: [1] }],
+  },
+};
+
+type Behaviour = 'ok' | 'refuse' | 'unconfigured' | 'outage' | 'refuseRole' | 'outageRole';
+function fakeLlm(behaviour: Behaviour): LlmClient & { calls: StructuredRequest<unknown>[] } {
   const calls: StructuredRequest<unknown>[] = [];
   return {
     configured: behaviour !== 'unconfigured',
@@ -84,38 +122,46 @@ function fakeLlm(behaviour: 'ok' | 'refuse' | 'unconfigured' | 'outage'): LlmCli
     },
     async generateStructured<T>(req: StructuredRequest<T>) {
       calls.push(req as StructuredRequest<unknown>);
+      const isRole = req.schemaName !== 'fir_extraction';
       if (behaviour === 'unconfigured') throw new LlmNotConfiguredError();
-      if (behaviour === 'refuse') throw new LlmRefusalError();
-      if (behaviour === 'outage') throw new Error('529 overloaded');
-      return { object: EXTRACTION as T, usage: {}, model: 'claude-opus-5-5' };
+      if (behaviour === 'refuse' || (behaviour === 'refuseRole' && isRole)) throw new LlmRefusalError();
+      if (behaviour === 'outage' || (behaviour === 'outageRole' && isRole)) throw new Error('529 overloaded');
+      return { object: (isRole ? ROLE_OUTPUT[req.schemaName] : EXTRACTION) as T, usage: {}, model: 'claude-opus-5-5' };
     },
   };
 }
 
-async function extractedDoc(type: CaseArtifact['artifactType'] = 'FIR_SCAN', text = FIR_TEXT) {
+async function extractedDoc(owner = citizen, type: CaseArtifact['artifactType'] = 'FIR_SCAN', text = FIR_TEXT) {
   const artifactId = newId();
   const repo = scoped(db, owner);
-  await repo.artifacts.createUpload({ artifactId, caseFileId: caseId, artifactType: type, fileStorageKey: `tenants/${owner}/cases/${caseId}/${artifactId}/original.pdf`, mimeType: 'application/pdf' });
+  await repo.artifacts.createUpload({ artifactId, caseFileId: cases[owner]!, artifactType: type, fileStorageKey: `tenants/${owner}/cases/${cases[owner]}/${artifactId}/original.pdf`, mimeType: 'application/pdf' });
   await repo.artifacts.setProcessing(artifactId, { processingStatus: 'EXTRACTING', rawExtractedText: text });
   return { artifactId, ownerUserId: owner };
 }
 
-const row = async (id: string) => (await scoped(db, owner).artifacts.findById(id))!;
+const row = async (id: string, owner = citizen) => (await scoped(db, owner).artifacts.findById(id))!;
+const quiet = { info: () => undefined, warn: () => undefined };
 
 describe('processAnalysisJob', () => {
-  it('extracts, post-processes and stores structured_analysis, then READY', async () => {
+  it('citizen: extracts, post-processes, saves structured_analysis, then a validated role_analysis, READY', async () => {
     const llm = fakeLlm('ok');
     const logs: object[] = [];
     const job = await extractedDoc();
-    expect(await processAnalysisJob({ db, llm, log: { info: (o) => void logs.push(o), warn: (o) => void logs.push(o) } }, job)).toEqual({ status: 'READY', analysed: true });
+    expect(await processAnalysisJob({ db, llm, log: { info: (o) => void logs.push(o), warn: (o) => void logs.push(o) } }, job)).toEqual({
+      status: 'READY',
+      analysed: true,
+      roleAnalysis: 'READY',
+    });
 
-    // The document goes to the model wrapped as data, with the frozen system prompt.
+    // Stage 3: the document goes to the model wrapped as data, phone/NID replaced.
     expect(llm.calls[0]).toMatchObject({ purpose: 'extraction', effort: 'medium', schemaName: 'fir_extraction' });
     const sent = String(llm.calls[0]!.messages[0]!.content);
     expect(sent.startsWith('<document>\n') && sent.endsWith('\n</document>')).toBe(true);
-    // Phone and NID numbers are replaced before the call (TRD §7.6).
     expect(sent).toContain('মোবাইল [ফোন নম্বর], NID [NID]');
     expect(sent).not.toMatch(/০১৭১১|4612345678/);
+    // Stage 6: citizen schema at low effort, with s.323's text pinned as source 1.
+    expect(llm.calls[1]).toMatchObject({ purpose: 'assistant', effort: 'low', schemaName: 'citizen_analysis' });
+    expect(String(llm.calls[1]!.messages[0]!.content)).toContain('<source n="1" section_ref="PENAL_CODE:323">');
 
     const a = await row(job.artifactId);
     expect(a).toMatchObject({ processingStatus: 'READY', processingError: null });
@@ -132,46 +178,87 @@ describe('processAnalysisJob', () => {
       ['34', 'DETECTOR', 'NOT_IN_VERIFIED_SCHEDULE'],
     ]);
     expect(s.rejectedSections).toEqual([{ section: '৩৭৯', actHint: 'দণ্ডবিধি', reason: 'NOT_FOUND_IN_TEXT' }]);
+
+    const r = a.roleAnalysis as RoleAnalysisRecord;
+    expect(r).toMatchObject({ status: 'READY', role: 'CITIZEN', language: 'BN', flags: [], sources: [{ n: 1, sectionId: s323, sectionRef: 'PENAL_CODE:323', currentTextUsed: false }] });
+
     // No document text or names in the logs (TRD §12.3).
     const logged = JSON.stringify(logs);
-    for (const s of ['করিম', 'রহিম', 'মারপিট', 'মিরপুর']) expect(logged).not.toContain(s);
+    for (const w of ['করিম', 'রহিম', 'মারপিট', 'মিরপুর', 'ইচ্ছাকৃতভাবে']) expect(logged).not.toContain(w);
   });
 
-  it('fails with LLM_REFUSED / LLM_NOT_CONFIGURED without retries', async () => {
+  it('lawyer: ingredient audit at high effort in English, invalid citation stripped', async () => {
+    const llm = fakeLlm('ok');
+    const job = await extractedDoc(lawyer);
+    expect(await processAnalysisJob({ db, llm, log: quiet }, job)).toMatchObject({ status: 'READY', roleAnalysis: 'READY' });
+    expect(llm.calls[1]).toMatchObject({ effort: 'high', schemaName: 'lawyer_analysis' });
+    expect(String(llm.calls[1]!.messages[0]!.content)).toContain('Write all text fields in English.');
+    const r = (await row(job.artifactId, lawyer)).roleAnalysis as RoleAnalysisRecord & { status: 'READY' };
+    expect(r).toMatchObject({ role: 'LAWYER', language: 'EN', flags: ['INVALID_CITATION_STRIPPED'] });
+    expect(r.content).toMatchObject({ sections: [{ ingredients: [{ source_ids: [1], evidence_in_fir: 'বাদী রহিমকে মারপিট করে' }] }] });
+  });
+
+  it('a stage-6 refusal keeps the deterministic analysis: READY with role_analysis FAILED', async () => {
+    const job = await extractedDoc();
+    expect(await processAnalysisJob({ db, llm: fakeLlm('refuseRole'), log: quiet }, job)).toMatchObject({ status: 'READY', roleAnalysis: 'FAILED' });
+    const a = await row(job.artifactId);
+    expect(a.structuredAnalysis).not.toBeNull();
+    expect(a.roleAnalysis).toEqual({ status: 'FAILED', code: 'LLM_REFUSED', role: 'CITIZEN' });
+  });
+
+  it('a stage-6 outage is retried from ANALYZING without re-running extraction', async () => {
+    const job = await extractedDoc();
+    await expect(processAnalysisJob({ db, llm: fakeLlm('outageRole'), log: quiet }, job)).rejects.toThrow('529');
+    const mid = await row(job.artifactId);
+    expect(mid.processingStatus).toBe('ANALYZING');
+    expect(mid.structuredAnalysis).not.toBeNull(); // visible while stage 6 is pending
+
+    const retry = fakeLlm('ok');
+    expect(await processAnalysisJob({ db, llm: retry, log: quiet }, job)).toMatchObject({ status: 'READY', roleAnalysis: 'READY' });
+    expect(retry.calls.map((c) => c.schemaName)).toEqual(['citizen_analysis']);
+  });
+
+  it('lawyer without any section text available: role_analysis UNAVAILABLE, no model call', async () => {
+    const llm = fakeLlm('ok');
+    const job = await extractedDoc(lawyer, 'FIR_SCAN', 'এজাহার। ১২/০৩/২০২৪ তারিখ। অস্ত্র আইনের ১৯এ ধারা।');
+    expect(await processAnalysisJob({ db, llm, log: quiet }, job)).toMatchObject({ status: 'READY', roleAnalysis: 'UNAVAILABLE' });
+    expect(llm.calls.map((c) => c.schemaName)).toEqual(['fir_extraction']);
+  });
+
+  it('fails with LLM_REFUSED / LLM_NOT_CONFIGURED at extraction, without retries', async () => {
     const a = await extractedDoc();
-    expect(await processAnalysisJob({ db, llm: fakeLlm('refuse'), log: console }, a)).toEqual({ status: 'FAILED', code: 'LLM_REFUSED' });
+    expect(await processAnalysisJob({ db, llm: fakeLlm('refuse'), log: quiet }, a)).toEqual({ status: 'FAILED', code: 'LLM_REFUSED' });
     expect(await row(a.artifactId)).toMatchObject({ processingStatus: 'FAILED', processingError: 'LLM_REFUSED', structuredAnalysis: null });
     const b = await extractedDoc();
-    expect(await processAnalysisJob({ db, llm: fakeLlm('unconfigured'), log: console }, b)).toEqual({ status: 'FAILED', code: 'LLM_NOT_CONFIGURED' });
+    expect(await processAnalysisJob({ db, llm: fakeLlm('unconfigured'), log: quiet }, b)).toEqual({ status: 'FAILED', code: 'LLM_NOT_CONFIGURED' });
   });
 
-  it('rethrows provider outages so BullMQ retries; the document stays retryable', async () => {
+  it('rethrows extraction outages so BullMQ retries; the document stays retryable', async () => {
     const a = await extractedDoc();
-    await expect(processAnalysisJob({ db, llm: fakeLlm('outage'), log: console }, a)).rejects.toThrow('529');
+    await expect(processAnalysisJob({ db, llm: fakeLlm('outage'), log: quiet }, a)).rejects.toThrow('529');
     expect((await row(a.artifactId)).processingStatus).toBe('EXTRACTING');
-    // The retry then succeeds.
-    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: console }, a)).toEqual({ status: 'READY', analysed: true });
+    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, a)).toMatchObject({ status: 'READY', analysed: true });
   });
 
   it('marks other document types READY without calling the LLM', async () => {
     const llm = fakeLlm('ok');
-    const a = await extractedDoc('SEIZURE_LIST', 'জব্দ তালিকা');
-    expect(await processAnalysisJob({ db, llm, log: console }, a)).toEqual({ status: 'READY', analysed: false });
+    const a = await extractedDoc(citizen, 'SEIZURE_LIST', 'জব্দ তালিকা');
+    expect(await processAnalysisJob({ db, llm, log: quiet }, a)).toEqual({ status: 'READY', analysed: false });
     expect(llm.calls).toHaveLength(0);
   });
 
   it('skips jobs for finished, deleted or foreign documents', async () => {
     const done = await extractedDoc();
-    await processAnalysisJob({ db, llm: fakeLlm('ok'), log: console }, done);
-    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: console }, done)).toEqual({ status: 'SKIPPED', reason: 'status READY' });
+    await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, done);
+    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, done)).toEqual({ status: 'SKIPPED', reason: 'status READY' });
 
     const gone = await extractedDoc();
-    await scoped(db, owner).artifacts.softDelete(gone.artifactId);
-    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: console }, gone)).toMatchObject({ status: 'SKIPPED' });
+    await scoped(db, citizen).artifacts.softDelete(gone.artifactId);
+    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, gone)).toMatchObject({ status: 'SKIPPED' });
 
     // Another user's id for this artifact: scoped() hides it.
     const mine = await extractedDoc();
-    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: console }, { artifactId: mine.artifactId, ownerUserId: newId() })).toMatchObject({ status: 'SKIPPED' });
+    expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, { artifactId: mine.artifactId, ownerUserId: newId() })).toMatchObject({ status: 'SKIPPED' });
     expect((await row(mine.artifactId)).processingStatus).toBe('EXTRACTING');
   });
 });

@@ -1,8 +1,15 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { filingDelay, mergeCitedSections, parseFirDateTime } from '@lawassist/legal-text';
 import { createLlmClient } from '@lawassist/providers';
 import { describe, expect, it } from 'vitest';
 import { extractFir } from '../src/analysis/extract';
+import type { StructuredAnalysisV1 } from '../src/analysis/post-process';
+import { generateRoleAnalysis } from '../src/analysis/roles';
+import type { PinnedSource } from '../src/analysis/sources';
+import { decodeBody } from '../src/scrape/http-client';
+import { parseActPrint } from '../src/scrape/parser';
+import { DEFAULT_SOURCE_CONFIG } from '../src/scrape/source-config';
 
 /**
  * Live FIR extraction against the configured model (BE-23). Opt-in, never in CI: it spends API
@@ -73,4 +80,69 @@ describe.skipIf(!live)('extractFir (live model)', () => {
     // "সেকশন-১১, ব্লক-গ" in the address is not a citation.
     expect(merged.sections.map((s) => s.key)).not.toContain('11');
   }, 180_000);
+
+  it('role analyses (stage 6) cite only pinned sources and never state an unverified status', async () => {
+    const llm = createLlmClient({
+      baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      models: { extraction: process.env.LLM_MODEL_EXTRACTION ?? 'claude-opus-5-5', assistant: process.env.LLM_MODEL_ASSISTANT ?? 'claude-opus-5-5' },
+    });
+    // Real Penal Code text from the bdlaws fixture, through the scraper's own parser.
+    const html = decodeBody(new Uint8Array(gunzipSync(readFileSync(new URL('./fixtures/bdlaws/act-print-11.html.gz', import.meta.url)))), 'text/html');
+    const act = parseActPrint(html, { bdlawsActId: 11, sourceUrl: 'http://bdlaws.minlaw.gov.bd/act-print-11.html' }, DEFAULT_SOURCE_CONFIG);
+    const merged = mergeCitedSections(FIR, [], { defaultAct: 'PENAL_CODE' }).sections.filter((s) => s.key !== '302');
+    const sources: PinnedSource[] = merged.map((s, i) => {
+      const sec = act.sections.find((x) => x.normalizedSectionKey === s.key)!;
+      return {
+        n: i + 1,
+        sectionRef: `PENAL_CODE:${s.key}`,
+        sectionId: `00000000-0000-0000-0000-00000000000${i + 1}`,
+        actName: 'The Penal Code, 1860',
+        sectionNumber: sec.sectionNumber,
+        marginalHeading: sec.marginalHeading,
+        contentBody: sec.contentBody,
+        versionNumber: 1,
+        validFrom: '1860-10-06',
+        currentTextUsed: false,
+      };
+    });
+    const occurrence = parseFirDateTime('১২/০৩/২০২৪ খ্রিঃ রাত অনুমান ০৯.৩০ ঘটিকা');
+    const reported = parseFirDateTime('১৪/০৩/২০২৪ খ্রিঃ সকাল ১০.১৫ ঘটিকা');
+    // No Schedule II rows: every section is unverified, so no status may survive validation.
+    const analysis: StructuredAnalysisV1 = {
+      version: 1,
+      occurrence,
+      reported,
+      filingDelay: filingDelay(occurrence, reported),
+      scheduleDate: '2024-03-12',
+      scheduleDateBasis: 'OCCURRENCE',
+      sections: merged.map((s) => ({ ...s, scheduleStatus: 'NOT_IN_VERIFIED_SCHEDULE' as const, schedule: null })),
+      rejectedSections: [],
+    };
+
+    for (const [role, language] of [['LAWYER', 'EN'], ['CITIZEN', 'BN']] as const) {
+      const started = Date.now();
+      const r = await generateRoleAnalysis(llm, { role, language, firText: FIR, analysis, sources });
+      console.log(`live ${role}: ${Date.now() - started} ms, flags ${JSON.stringify(r.flags)}\n${JSON.stringify(r.content, null, 1)}`);
+      const text = JSON.stringify(r.content);
+      expect(text).not.toMatch(/জামিন\s?-?\s?(?:যোগ্য|অযোগ্য)|অজামিনযোগ্য|আমলযোগ্য|আপো?ষযোগ্য|\bbailable|\bcognizable|\bcompoundable/i);
+      const refs = new Set(sources.map((s) => s.sectionRef));
+      const ids = new Set(sources.map((s) => s.n));
+      const content = r.content as { sections: { section_ref: string; source_ids?: number[]; ingredients?: { source_ids: number[]; status: string }[] }[] };
+      expect(content.sections.length).toBeGreaterThan(0);
+      for (const s of content.sections) {
+        expect(refs.has(s.section_ref)).toBe(true);
+        for (const id of [...(s.source_ids ?? []), ...(s.ingredients ?? []).flatMap((i) => i.source_ids)]) expect(ids.has(id)).toBe(true);
+      }
+      if (role === 'LAWYER') {
+        const l = r.content as { sections: { section_ref: string; ingredients: { status: string }[] }[]; delay: { assessment: string; evidence_in_fir: string | null } };
+        // s.323 (hurt with a stick) is plainly alleged.
+        expect(l.sections.find((s) => s.section_ref === 'PENAL_CODE:323')!.ingredients.some((i) => i.status === 'ALLEGED')).toBe(true);
+        // The FIR offers "after treatment" for the 2-day delay. Whether that suffices is a judgement
+        // (a defence reading may call it unexplained); the audit must find and quote it either way.
+        expect(['EXPLAINED', 'UNEXPLAINED']).toContain(l.delay.assessment);
+        expect(l.delay.evidence_in_fir).toContain('চিকিৎসা');
+      }
+    }
+  }, 300_000);
 });
