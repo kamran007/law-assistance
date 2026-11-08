@@ -85,7 +85,8 @@ describe('VerifierPanel', () => {
     authStore.setSession('at', 900, me('CITIZEN'));
     renderIn(<VerifierPanel target={{ actId: 11, sec: '420', asOf: '2020-01-01' }} onClose={() => undefined} />);
     expect(await screen.findByText(/ten years, and fine/)).toBeTruthy();
-    expect(api.calls.map((c) => c.path)).toEqual(['/api/v1/statutes/11/sections/420']);
+    // The section itself (no as_of), plus the judgments block's own request.
+    expect(api.calls.map((c) => c.path).filter((p) => !p.endsWith('/judgments'))).toEqual(['/api/v1/statutes/11/sections/420']);
     expect(api.calls[0]!.headers.get('authorization')).toBe('Bearer at');
     expect(screen.queryByRole('button', { name: en.verifier.history })).toBeNull();
     const dialog = screen.getByRole('dialog', { name: en.verifier.title });
@@ -145,7 +146,7 @@ describe('opening from the scan result', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Penal Code, s. ৪২০' }));
     expect(await screen.findByRole('dialog', { name: en.verifier.title })).toBeTruthy();
-    await waitFor(() => expect(api.calls.at(-1)?.path).toBe('/api/v1/statutes/11/sections/420'));
+    await waitFor(() => expect(api.calls.filter((c) => !c.path.endsWith('/judgments')).at(-1)?.path).toBe('/api/v1/statutes/11/sections/420'));
     expect(await screen.findByText(/seven years/)).toBeTruthy(); // the as_of text
   });
 });

@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/use-auth';
 import { isProfessional, isStatus } from '@/lib/cases';
 import { citation, useSectionView, type VerifierTarget } from '@/lib/verifier';
+import { SectionJudgments } from '../case-law/section-judgments';
 import { VersionHistory } from './version-history';
 
 const VerifierContext = createContext<(t: VerifierTarget) => void>(() => undefined);
@@ -164,6 +165,7 @@ export function VerifierPanel({ target, onClose }: { target: VerifierTarget; onC
                     <p className="text-xs text-[var(--muted)]">{t('scheduleNote')}</p>
                   </div>
                 )}
+                <SectionJudgments actId={act.act_id} sec={s.sec} />
               </>
             );
           })()

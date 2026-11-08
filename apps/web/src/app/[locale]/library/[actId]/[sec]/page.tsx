@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { cache } from 'react';
+import { SectionJudgments } from '@/components/case-law/section-judgments';
 import { LibraryProTools } from '@/components/verifier/library-pro-tools';
 import { Link } from '@/i18n/navigation';
 import { actTitle, dataOrNull, LIBRARY_REVALIDATE_S, serverApi } from '@/lib/server-api';
@@ -112,6 +113,7 @@ export default async function SectionPage({ params }: { params: Promise<{ locale
         </section>
       )}
       <LibraryProTools actId={act.act_id} sec={s.sec} lang={lang} />
+      <SectionJudgments actId={act.act_id} sec={s.sec} />
       <p className="text-xs text-[var(--muted)]">{t('verbatimNote')}</p>
     </article>
   );

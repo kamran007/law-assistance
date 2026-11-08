@@ -20,6 +20,11 @@ type Json<T> = T extends { content: { 'application/json': infer B } } ? B : neve
 export type StatuteList = Json<paths['/api/v1/statutes']['get']['responses'][200]>;
 export type StatuteDetail = Json<paths['/api/v1/statutes/{act_id}']['get']['responses'][200]>;
 export type SectionDetail = Json<paths['/api/v1/statutes/{act_id}/sections/{sec}']['get']['responses'][200]>;
+export type JudgmentList = Json<paths['/api/v1/judgments']['get']['responses'][200]>;
+export type JudgmentDetail = Json<paths['/api/v1/judgments/{judgment_id}']['get']['responses'][200]>;
+
+/** Judgment text language → the lang attribute (MIXED pages are mostly English with Bangla quotes). */
+export const judgmentLang = (l: 'EN' | 'BN' | 'MIXED') => (l === 'BN' ? 'bn' : 'en');
 
 /**
  * Data, `null` when the thing doesn't exist, or throws for anything else (the page shows its error

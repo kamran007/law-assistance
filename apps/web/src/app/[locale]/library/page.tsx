@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
+import { LibraryTabs } from '@/components/library/library-tabs';
 import { Link } from '@/i18n/navigation';
 import { actTitle, dataOrNull, LIBRARY_REVALIDATE_S, serverApi } from '@/lib/server-api';
 
@@ -40,6 +41,7 @@ export default async function LibraryPage({ params, searchParams }: { params: Pr
 
   return (
     <div className="space-y-6">
+      <LibraryTabs current="acts" />
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">{t('title')}</h1>
         <p className="text-[var(--muted)]">{t('description')}</p>
