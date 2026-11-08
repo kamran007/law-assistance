@@ -219,7 +219,7 @@ function Documents({ id }: { id: string }) {
       ) : (
         <ul className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)]">
           {data.map((a: Artifact) => (
-            <DocumentCard key={a.artifact_id} caseId={id} artifact={a} onUploadAgain={() => setDialog({ file: null })} />
+            <DocumentCard key={a.artifact_id} caseId={id} artifact={a} linkToResult onUploadAgain={() => setDialog({ file: null })} />
           ))}
         </ul>
       )}

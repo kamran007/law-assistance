@@ -184,7 +184,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **BE-25** Stage 6: role analyses (Citizen explanation / Lawyer ingredient audit / Judge charge matrix) with pinned sources + citation validation
 - [x] **BE-26** Artifact status SSE (`/events`) via Redis pub/sub · field-correction PATCH + `/reanalyze` · push notification hook (FCM)
 - [x] **WEB-07** Upload modal (drag-drop, validation) + document card with progress stepper (App Flow §9.2–9.3)
-- [ ] **WEB-08** Scan Result screen: FIR details, editable fields, Schedule II table, role-specific analysis, "Ask about this document" routed by role (App Flow §9.4)
+- [~] **WEB-08** Scan Result screen: FIR details, editable fields, Schedule II table, role-specific analysis, "Ask about this document" routed by role (App Flow §9.4)
 
 ### Voice Query
 - [ ] **BE-30** `SttProvider` (Google STT v2) + `/voice/transcribe-query` with ffmpeg transcoding · *Depends:* PRE-04

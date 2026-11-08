@@ -39,8 +39,12 @@ export function useArtifactStatus(caseId: string, artifact: Pick<Artifact, 'arti
       qc.setQueryData<Artifact[]>(caseKeys.artifacts(caseId), (list) =>
         list?.map((a) => (a.artifact_id === id ? { ...a, processing_status: e.status, processing_error: e.error } : a)),
       );
-      // The finished document's details (and the case's counts) are worth a fresh read.
-      if (TERMINAL.has(e.status)) void qc.invalidateQueries({ queryKey: caseKeys.artifacts(caseId) });
+      qc.setQueryData<{ processing_status: string | null; processing_error: string | null }>([...caseKeys.artifacts(caseId), id], (d) =>
+        d ? { ...d, processing_status: e.status, processing_error: e.error } : d,
+      );
+      // Schedule II results are stored at ANALYZING (before the role analysis); the finished
+      // document's details at READY / FAILED. The prefix also refreshes the single-document view.
+      if (TERMINAL.has(e.status) || e.status === 'ANALYZING') void qc.invalidateQueries({ queryKey: caseKeys.artifacts(caseId) });
     };
 
     const poll = () => {

@@ -111,7 +111,9 @@
     "VALIDATION_FAILED": "Please check the form: some fields are not filled in correctly.",
     "OFFENSE_DATE_IN_FUTURE": "The offense date can't be in the future.",
     "VERSION_CONFLICT": "This case was changed somewhere else. The latest details are shown; please make your change again.",
-    "NOT_FOUND": "Not found."
+    "NOT_FOUND": "Not found.",
+    "ARTIFACT_BUSY": "The document is being processed. Try again when it has finished.",
+    "NOT_CORRECTABLE": "This document's details can't be edited."
   },
   "cases": {
     "title": "My cases",
@@ -223,6 +225,116 @@
         "RATE_LIMITED": "Too many uploads. Try again in a little while.",
         "NETWORK": "Can't reach the server.",
         "generic": "Couldn't upload. Please try again in a moment."
+      }
+    }
+  },
+  "scan": {
+    "title": "Scan result",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the result.",
+    "notFound": "Document not found.",
+    "back": "← Case documents",
+    "lowConfidence": "Some text may be unclear — please review the details.",
+    "noAnalysis": "There is no automatic analysis for this kind of document.",
+    "askSoon": "\"Ask about this document\" is coming with the chat.",
+    "fir": {
+      "title": "FIR details",
+      "notStated": "Not stated",
+      "policeStation": "Thana",
+      "district": "District",
+      "firNumber": "FIR no.",
+      "grNumber": "G.R. no.",
+      "place": "Place of occurrence",
+      "occurrence": "Occurrence",
+      "reported": "Reported",
+      "unparsed": "\"{raw}\" (date not understood)",
+      "approximate": "approximate",
+      "ambiguousTime": "It isn't clear whether this is morning or night.",
+      "reportedBefore": "The report is dated before the occurrence — probably a reading or writing error. Please check both dates.",
+      "delayDaysHours": "Delay in filing: {days} days {hours} hours",
+      "delayDays": "Delay in filing: {days} days",
+      "informant": "Informant",
+      "accused": "Accused",
+      "witnesses": "Witnesses",
+      "summary": "Allegation in brief"
+    },
+    "edit": {
+      "open": "Edit fields",
+      "save": "Save corrections",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "onePerLine": "One name per line.",
+      "dateHint": "As written in the document (e.g. \"12/03/2024 9 pm\").",
+      "sections": "Cited sections",
+      "actLabel": "Act of section {n}",
+      "sectionLabel": "Section {n}",
+      "actPlaceholder": "Act (e.g. Penal Code)",
+      "removeSection": "Remove section {n}",
+      "addSection": "+ Add section",
+      "sectionsHint": "The analysis uses exactly these sections. Without an Act name, the Penal Code is assumed.",
+      "needsReanalysis": "Dates or sections were changed. Run the analysis again with the corrections.",
+      "reanalyze": "Analyse again"
+    },
+    "sections": {
+      "title": "Cited sections and CrPC Schedule II",
+      "caption": "Cited sections from the verified schedule",
+      "none": "No sections were found in the document.",
+      "section": "Section",
+      "cognizable": "Cognizable",
+      "bailable": "Bailable",
+      "compoundable": "Compoundable",
+      "maxPunishment": "Max punishment",
+      "court": "Triable by",
+      "yes": "Yes",
+      "no": "No",
+      "ref": "{act}, s. {section}",
+      "unknownAct": "Unknown Act",
+      "actInferred": "No Act named; Penal Code assumed",
+      "userCorrected": "Your correction",
+      "notVerified": "Not in verified schedule — check the statute text.",
+      "basis": "Schedule as in force on {date}. Values come only from the verified schedule, never from AI."
+    },
+    "analysis": {
+      "title": "Analysis",
+      "preparing": "Preparing the analysis…",
+      "none": "No analysis available.",
+      "unavailable": "The cited sections' text isn't in the law library yet, so no analysis can be given.",
+      "failed": "The analysis couldn't be produced. Try \"Analyse again\" later.",
+      "ref": "{act}, s. {section}",
+      "citationTitle": "Statute text, version {version}",
+      "currentTextUsed": "The text in force on the occurrence date wasn't available; some citations use the current text.",
+      "disclaimer": "This is legal information, not legal advice.",
+      "ingredient": {
+        "ALLEGED": "Alleged",
+        "NOT_ALLEGED": "Not alleged",
+        "UNCLEAR": "Unclear"
+      },
+      "citizen": {
+        "sections": "What the sections mean",
+        "nextSteps": "What you can do now"
+      },
+      "lawyer": {
+        "audit": "Ingredient & loophole audit",
+        "grounds": "Possible grounds",
+        "delay": {
+          "NO_DELAY": "No delay in filing",
+          "EXPLAINED": "Delay explained",
+          "UNEXPLAINED": "Delay not explained",
+          "UNKNOWN": "Delay could not be assessed"
+        },
+        "kind": {
+          "BAIL": "Bail",
+          "QUASHMENT": "Quashment",
+          "OTHER": "Other"
+        }
+      },
+      "judge": {
+        "matrix": "Charge-framing matrix",
+        "ingredient": "Ingredient",
+        "allegation": "What is alleged",
+        "status": "Status",
+        "noAllegation": "Not stated",
+        "observations": "Observations"
       }
     }
   }

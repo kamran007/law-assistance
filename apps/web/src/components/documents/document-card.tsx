@@ -2,13 +2,14 @@
 
 import { useFormatter, useTranslations } from 'next-intl';
 import { useArtifactStatus, type StatusStreamDeps } from '@/lib/artifact-status';
+import { Link } from '@/i18n/navigation';
 import type { Artifact } from '@/lib/cases';
 
 /** Processing steps shown on the card (App Flow §9.3). */
 export const STEPS = ['UPLOADED', 'OCR', 'EXTRACTING', 'SCHEDULE_LOOKUP', 'ANALYZING'] as const;
 
 /** A document in the Documents tab, with a live progress stepper until it is READY or FAILED. */
-export function DocumentCard({ caseId, artifact, onUploadAgain, streamDeps }: { caseId: string; artifact: Artifact; onUploadAgain: () => void; streamDeps?: StatusStreamDeps }) {
+export function DocumentCard({ caseId, artifact, onUploadAgain, streamDeps, linkToResult = false }: { caseId: string; artifact: Artifact; onUploadAgain?: () => void; streamDeps?: StatusStreamDeps; linkToResult?: boolean }) {
   const t = useTranslations('cases.documents');
   const format = useFormatter();
   useArtifactStatus(caseId, artifact, streamDeps);
@@ -20,7 +21,13 @@ export function DocumentCard({ caseId, artifact, onUploadAgain, streamDeps }: { 
     <li className="space-y-3 px-4 py-3" aria-busy={status !== 'READY' && status !== 'FAILED'}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium">{typeLabel}</p>
+          {linkToResult ? (
+            <Link href={`/cases/${caseId}/documents/${artifact.artifact_id}`} className="font-medium text-brand-700 hover:underline">
+              {typeLabel}
+            </Link>
+          ) : (
+            <p className="font-medium">{typeLabel}</p>
+          )}
           <p className="text-xs text-[var(--muted)]">{format.dateTime(new Date(artifact.created_at), { dateStyle: 'medium', timeStyle: 'short' })}</p>
         </div>
         <span
@@ -50,9 +57,11 @@ export function DocumentCard({ caseId, artifact, onUploadAgain, streamDeps }: { 
           <p role="alert" className="text-red-800 dark:text-red-200">
             {t('failed')}
           </p>
-          <button type="button" onClick={onUploadAgain} className="text-brand-700 underline">
-            {t('uploadAgain')}
-          </button>
+          {onUploadAgain && (
+            <button type="button" onClick={onUploadAgain} className="text-brand-700 underline">
+              {t('uploadAgain')}
+            </button>
+          )}
         </div>
       )}
     </li>

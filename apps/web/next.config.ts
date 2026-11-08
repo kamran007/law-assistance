@@ -5,6 +5,8 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // A separate output folder lets a verification build run while `next dev` uses .next.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   poweredByHeader: false,
   // Workspace packages ship TypeScript sources.
   transpilePackages: ['@lawassist/contracts'],

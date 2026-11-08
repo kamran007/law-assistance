@@ -17,6 +17,8 @@ export const KNOWN_ERRORS = [
   'OFFENSE_DATE_IN_FUTURE',
   'VERSION_CONFLICT',
   'NOT_FOUND',
+  'ARTIFACT_BUSY',
+  'NOT_CORRECTABLE',
   'NETWORK',
 ] as const;
 export type ErrorKey = (typeof KNOWN_ERRORS)[number] | 'generic';

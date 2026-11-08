@@ -2,10 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { en, problem, renderIn, stubApi, type ApiStub } from './helpers';
 
 /** WEB-07: client-side validation, presigned upload flow, upload dialog, live status on the card. */
+vi.mock('@/i18n/navigation', () => ({ Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 const { contentTypeOf, validateFile, uploadDocument, MAX_UPLOAD_BYTES, UploadError } = await import('@/lib/upload');
 const { UploadDialog } = await import('@/components/documents/upload-dialog');
 const { DocumentCard } = await import('@/components/documents/document-card');
