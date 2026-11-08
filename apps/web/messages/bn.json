@@ -8,7 +8,8 @@
     "skip": "মূল অংশে যান",
     "signIn": "সাইন ইন",
     "signOut": "সাইন আউট",
-    "cases": "মামলা"
+    "cases": "মামলা",
+    "library": "আইন লাইব্রেরি"
   },
   "language": {
     "label": "ভাষা",
@@ -339,5 +340,46 @@
     },
     "viewOriginal": "মূল স্ক্যান দেখুন",
     "originalFailed": "মূল ফাইলটি খোলা যায়নি। আবার চেষ্টা করুন।"
+  },
+  "library": {
+    "title": "আইন লাইব্রেরি",
+    "description": "বাংলাদেশের আইন ও ধারার মূল পাঠ, bdlaws থেকে নিয়মিত হালনাগাদ।",
+    "searchLabel": "খুঁজুন",
+    "searchPlaceholder": "আইনের নাম, নম্বর বা সাল",
+    "status": "অবস্থা",
+    "statusAll": "সব",
+    "statusActive": "বলবৎ",
+    "statusRepealed": "রহিত",
+    "year": "সাল",
+    "search": "খুঁজুন",
+    "loadFailed": "আইন লাইব্রেরি এখন লোড করা যাচ্ছে না। একটু পরে আবার চেষ্টা করুন।",
+    "noResults": "কোনো আইন পাওয়া যায়নি।",
+    "count": "{count, number}টি আইন",
+    "pagination": "পাতা",
+    "previous": "← আগের পাতা",
+    "next": "পরের পাতা →",
+    "pageOf": "{pages, number} পাতার {page, number} নম্বর",
+    "backToList": "← আইন লাইব্রেরি",
+    "enacted": "প্রণয়ন {date}",
+    "repealedNotice": "এই আইনটি রহিত হয়েছে। পাঠ কেবল ঐতিহাসিক রেফারেন্সের জন্য।",
+    "noSections": "এই আইনের ধারাগুলো এখনো সংগ্রহ করা হয়নি।",
+    "noChapter": "অধ্যায় ছাড়া",
+    "sectionCount": "{count, number}টি ধারা",
+    "source": "উৎস:",
+    "synced": "সর্বশেষ মিলানো {date}",
+    "sectionTitle": "ধারা {section}",
+    "version": "সংস্করণ {version}",
+    "inForceFrom": "{date} থেকে বলবৎ",
+    "scheduleTitle": "ফৌজদারি কার্যবিধি, দ্বিতীয় তফসিল",
+    "scheduleNote": "যাচাইকৃত তফসিল থেকে, এআই অনুমান নয়।",
+    "footnotes": "পাদটীকা",
+    "footnoteAction": {
+      "SUBSTITUTED": "প্রতিস্থাপিত",
+      "INSERTED": "সন্নিবেশিত",
+      "OMITTED": "বিলুপ্ত",
+      "OTHER": "সংশোধিত"
+    },
+    "verbatimNote": "প্রকাশিত মূল পাঠ, অপরিবর্তিত। আইনি পরামর্শ নয়।",
+    "retry": "আবার চেষ্টা করুন"
   }
 }

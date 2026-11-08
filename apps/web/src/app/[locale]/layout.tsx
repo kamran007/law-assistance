@@ -53,6 +53,9 @@ export default async function LocaleLayout({ children, params }: { children: Rea
                   {t('brand')}
                 </Link>
                 <div className="flex items-center gap-3">
+                  <Link href="/library" className="text-sm font-medium text-brand-700 hover:underline">
+                    {t('library')}
+                  </Link>
                   <LanguageSwitcher />
                   <AccountMenu />
                 </div>

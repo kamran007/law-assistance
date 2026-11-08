@@ -8,7 +8,8 @@
     "skip": "Skip to main content",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "cases": "Cases"
+    "cases": "Cases",
+    "library": "Law library"
   },
   "language": {
     "label": "Language",
@@ -339,5 +340,46 @@
     },
     "viewOriginal": "View original scan",
     "originalFailed": "The original file couldn’t be opened. Please try again."
+  },
+  "library": {
+    "title": "Law library",
+    "description": "The verbatim text of Bangladesh Acts and sections, synced regularly from bdlaws.",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Act title, number or year",
+    "status": "Status",
+    "statusAll": "All",
+    "statusActive": "In force",
+    "statusRepealed": "Repealed",
+    "year": "Year",
+    "search": "Search",
+    "loadFailed": "The law library can't be loaded right now. Please try again shortly.",
+    "noResults": "No Acts found.",
+    "count": "{count, plural, one {# Act} other {# Acts}}",
+    "pagination": "Pages",
+    "previous": "← Previous",
+    "next": "Next →",
+    "pageOf": "Page {page, number} of {pages, number}",
+    "backToList": "← Law library",
+    "enacted": "Enacted {date}",
+    "repealedNotice": "This Act has been repealed. Its text is shown for historical reference only.",
+    "noSections": "This Act's sections haven't been collected yet.",
+    "noChapter": "Without chapter",
+    "sectionCount": "{count, plural, one {# section} other {# sections}}",
+    "source": "Source:",
+    "synced": "last synced {date}",
+    "sectionTitle": "Section {section}",
+    "version": "Version {version}",
+    "inForceFrom": "in force from {date}",
+    "scheduleTitle": "CrPC Schedule II",
+    "scheduleNote": "From the verified schedule, not AI.",
+    "footnotes": "Footnotes",
+    "footnoteAction": {
+      "SUBSTITUTED": "Substituted",
+      "INSERTED": "Inserted",
+      "OMITTED": "Omitted",
+      "OTHER": "Amended"
+    },
+    "verbatimNote": "Published text, unchanged. Not legal advice.",
+    "retry": "Try again"
   }
 }

@@ -149,7 +149,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **WEB-02** Auth screens: language picker, login, OTP, profile setup, credential entry, pending-verification banner (App Flow §3)
 - [ ] **WEB-03** Assistant chat: SSE parser via `fetch` stream, streaming render, citation chips, retry on interrupt, conversation history sidebar (rename/delete) (App Flow §4–5)
 - [ ] **WEB-04** Law Verifier side panel: verbatim text, footnotes, Schedule II strip, version history & diff (Lawyer/Judge) (App Flow §7.1)
-- [ ] **WEB-05** Law Library: search, Act tree, section pages (public, SSR/ISR) (App Flow §7.2)
+- [x] **WEB-05** Law Library: search, Act tree, section pages (public, SSR/ISR) (App Flow §7.2)
 - [x] **WEB-06** Case list + workspace shell (Overview, Documents, Drafts, Conversation tabs, shown by role) (App Flow §8)
 
 ### Case Law — SCOB harvester (Module D, SRS §4.4, TRD §6A)
