@@ -194,6 +194,23 @@ describe('ScanResult', () => {
     expect(screen.getByRole('heading', { name: bn.scan.fir.title })).toBeTruthy();
   });
 
+  it('"View original scan" opens a tab at once, then points it at the signed link', async () => {
+    api.routes[`GET ${URL_}/original`] = () => Response.json({ url: 'https://s3.test/signed', expires_in: 300, mime_type: 'application/pdf' });
+    const tab = { opener: {} as unknown, location: { href: 'about:blank' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    renderIn(<ScanResult caseId={CASE} artId={ART} />);
+    await userEvent.click(await screen.findByRole('button', { name: en.scan.viewOriginal }));
+    expect(open).toHaveBeenCalledWith('about:blank', '_blank');
+    await waitFor(() => expect(tab.location.href).toBe('https://s3.test/signed'));
+    expect(tab.opener).toBeNull();
+
+    api.routes[`GET ${URL_}/original`] = () => problem(404, 'NOT_FOUND');
+    await userEvent.click(screen.getByRole('button', { name: en.scan.viewOriginal }));
+    expect((await screen.findByRole('alert')).textContent).toBe(en.scan.originalFailed);
+    expect(tab.close).toHaveBeenCalled();
+    open.mockRestore();
+  });
+
   it('not found (another user’s or a missing document)', async () => {
     api.routes[`GET ${URL_}`] = () => problem(404, 'NOT_FOUND');
     renderIn(<ScanResult caseId={CASE} artId={ART} />);

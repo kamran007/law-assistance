@@ -92,6 +92,8 @@ const toEvent = (a: CaseArtifact): ArtifactEvent => ({
 });
 
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'Not found');
+/** Download links for the original file are short-lived: the link itself grants access. */
+export const ORIGINAL_URL_TTL_SECONDS = 5 * 60;
 const busy = () => new ApiError(409, 'ARTIFACT_BUSY', 'The document is being processed', 'Wait until processing has finished (status READY)');
 
 /**
@@ -217,6 +219,31 @@ export const documentRoutes =
         if (!a || a.caseFileId !== req.params.id) throw notFound();
         setVersionEtag(reply, a.version);
         return toDetail(a);
+      },
+    );
+
+    app.get(
+      '/cases/:id/artifacts/:art_id/original',
+      {
+        config: { access: 'tenant', rateLimit: { max: 60, timeWindow: '1 minute' } },
+        schema: {
+          tags: ['documents'],
+          summary: 'Short-lived link to the original uploaded file ("View original scan")',
+          params: artifactParams,
+          response: { 200: z.object({ url: z.string(), expires_in: z.number().int(), mime_type: z.string() }) },
+        },
+      },
+      async (req, reply) => {
+        const { repo } = await auth(req);
+        const a = await repo.artifacts.findById(req.params.art_id);
+        if (!a || a.caseFileId !== req.params.id || !a.fileStorageKey) throw notFound();
+        const mime = a.mimeType ?? 'application/octet-stream';
+        const ext = a.fileStorageKey.split('.').pop() ?? 'bin';
+        // PDFs and images open in the browser; a DOCX can only be downloaded.
+        const disposition = mime === 'application/pdf' || mime.startsWith('image/') ? 'inline' : 'attachment';
+        const url = await deps.storage.presignGet(a.fileStorageKey, { ttlSeconds: ORIGINAL_URL_TTL_SECONDS, contentType: mime, disposition, filename: `original.${ext}` });
+        reply.header('cache-control', 'no-store');
+        return { url, expires_in: ORIGINAL_URL_TTL_SECONDS, mime_type: mime };
       },
     );
 

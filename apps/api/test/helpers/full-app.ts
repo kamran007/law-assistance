@@ -23,6 +23,9 @@ export class MemoryDocumentStorage implements DocumentStorage {
     const o = this.objects.get(key);
     return o ? { sizeBytes: o.bytes.length, contentType: o.contentType } : null;
   }
+  async presignGet(key: string, opts: { ttlSeconds: number; contentType: string; disposition: string; filename: string }) {
+    return `memory://${key}?ttl=${opts.ttlSeconds}&type=${encodeURIComponent(opts.contentType)}&disposition=${opts.disposition}`;
+  }
   async readStart(key: string, n: number) {
     return (this.objects.get(key)?.bytes ?? new Uint8Array()).slice(0, n);
   }

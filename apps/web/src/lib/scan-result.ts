@@ -122,3 +122,20 @@ export function useReanalyze(caseId: string, artId: string) {
     },
   });
 }
+
+/**
+ * Opens the original upload in a new tab. The tab is opened synchronously in the click handler
+ * (browsers block windows opened after an await), then pointed at the short-lived signed link.
+ */
+export async function openOriginal(caseId: string, artId: string, win: Pick<Window, 'open'> = window): Promise<void> {
+  const tab = win.open('about:blank', '_blank');
+  if (tab) tab.opener = null;
+  try {
+    const { url } = await unwrap(api.GET('/api/v1/cases/{id}/artifacts/{art_id}/original', { params: { path: { id: caseId, art_id: artId } } }));
+    if (tab) tab.location.href = url;
+    else win.open(url, '_blank', 'noopener');
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}

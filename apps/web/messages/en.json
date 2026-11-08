@@ -336,6 +336,8 @@
         "noAllegation": "Not stated",
         "observations": "Observations"
       }
-    }
+    },
+    "viewOriginal": "View original scan",
+    "originalFailed": "The original file couldn’t be opened. Please try again."
   }
 }

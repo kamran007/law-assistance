@@ -27,7 +27,7 @@ export async function buildOpenApiSpec(): Promise<Record<string, unknown>> {
     documents: {
       db,
       authenticate,
-      storage: { presignPut: unused, head: unused, readStart: unused },
+      storage: { presignPut: unused, head: unused, readStart: unused, presignGet: unused },
       queue: { enqueue: unused },
       analysis: { enqueueReanalysis: unused },
       events: { subscribe: unused },

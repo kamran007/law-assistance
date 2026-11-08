@@ -14,6 +14,8 @@ export interface DocumentStorage {
   head(key: string): Promise<{ sizeBytes: number; contentType: string | undefined } | null>;
   /** The first `n` bytes, for the magic-byte check. */
   readStart(key: string, n: number): Promise<Uint8Array>;
+  /** Short-lived download link for the owner ("View original scan"). */
+  presignGet(key: string, opts: { ttlSeconds: number; contentType: string; disposition: 'inline' | 'attachment'; filename: string }): Promise<string>;
 }
 
 export interface S3StorageConfig {
@@ -69,6 +71,18 @@ export class S3DocumentStorage implements DocumentStorage {
       if (status === 404 || status === 403) return null;
       throw err;
     }
+  }
+
+  async presignGet(key: string, opts: { ttlSeconds: number; contentType: string; disposition: 'inline' | 'attachment'; filename: string }): Promise<string> {
+    // The response headers are part of the signature: the link serves this type and disposition only.
+    const cmd = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ResponseContentType: opts.contentType,
+      ResponseContentDisposition: `${opts.disposition}; filename="${opts.filename}"`,
+      ResponseCacheControl: 'private, no-store',
+    });
+    return getSignedUrl(this.s3, cmd, { expiresIn: opts.ttlSeconds });
   }
 
   async readStart(key: string, n: number): Promise<Uint8Array> {

@@ -49,6 +49,25 @@ describe('artifact detail', () => {
   });
 });
 
+describe('GET original', () => {
+  it('returns a short-lived inline link for the uploaded PDF, not cached', async () => {
+    const id = await doc();
+    const res = await f.app.inject({ method: 'GET', url: url(id, '/original'), headers: auth() });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    const body = res.json();
+    expect(body).toMatchObject({ expires_in: 300, mime_type: 'application/pdf' });
+    expect(body.url).toBe(`memory://tenants/${user.userId}/cases/${caseId}/${id}/original.pdf?ttl=300&type=application%2Fpdf&disposition=inline`);
+  });
+
+  it("a document of the caller's other case is not found through this case", async () => {
+    const id = await doc();
+    const other = (await f.app.inject({ method: 'POST', url: '/api/v1/cases', payload: { title: 'Other' }, headers: auth() })).json().case_id;
+    const res = await f.app.inject({ method: 'GET', url: `/api/v1/cases/${other}/artifacts/${id}/original`, headers: auth() });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
 describe('PATCH corrections', () => {
   const patch = (id: string, payload: object, headers: Record<string, string> = { 'if-match': '"1"' }) => f.app.inject({ method: 'PATCH', url: url(id), payload, headers: auth(headers) });
 

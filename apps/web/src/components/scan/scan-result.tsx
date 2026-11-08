@@ -6,7 +6,7 @@ import { DocumentCard } from '@/components/documents/document-card';
 import { Link } from '@/i18n/navigation';
 import { isStatus } from '@/lib/cases';
 import { errorKey } from '@/lib/problem';
-import { LOW_OCR_CONFIDENCE, useArtifactDetail, useCorrectArtifact, useReanalyze, type RoleAnalysis, type StoredAnalysis } from '@/lib/scan-result';
+import { LOW_OCR_CONFIDENCE, openOriginal, useArtifactDetail, useCorrectArtifact, useReanalyze, type RoleAnalysis, type StoredAnalysis } from '@/lib/scan-result';
 import { CorrectionsForm } from './corrections-form';
 import { FirDetails } from './fir-details';
 import { RoleAnalysisBlock } from './role-analysis';
@@ -23,6 +23,7 @@ export function ScanResult({ caseId, artId }: { caseId: string; artId: string })
   const correct = useCorrectArtifact(caseId, artId);
   const reanalyze = useReanalyze(caseId, artId);
   const [editing, setEditing] = useState(false);
+  const [originalError, setOriginalError] = useState(false);
 
   if (detail.isPending) return <p role="status" className="text-[var(--muted)]">{t('loading')}</p>;
   if (detail.isError) {
@@ -51,7 +52,24 @@ export function ScanResult({ caseId, artId }: { caseId: string; artId: string })
         <Link href={`/cases/${caseId}?tab=documents`} className="text-sm text-brand-700 underline">
           {t('back')}
         </Link>
-        <h1 className="text-2xl font-semibold">{typeLabel}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-semibold">{typeLabel}</h1>
+          <button
+            type="button"
+            onClick={() => {
+              setOriginalError(false);
+              openOriginal(caseId, artId).catch(() => setOriginalError(true));
+            }}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm"
+          >
+            {t('viewOriginal')}
+          </button>
+        </div>
+        {originalError && (
+          <p role="alert" className="text-sm text-red-800 dark:text-red-200">
+            {t('originalFailed')}
+          </p>
+        )}
       </div>
 
       {(processing || status === 'FAILED') && (
