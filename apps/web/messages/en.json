@@ -421,5 +421,43 @@
     "proTools": "For lawyers and judges",
     "lawOnDate": "Law on a date",
     "showText": "Show text"
+  },
+  "drafts": {
+    "title": "Draft",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the draft.",
+    "notFound": "Draft not found.",
+    "back": "← Case drafts",
+    "new": "+ New draft",
+    "chooseTemplate": "Choose a template",
+    "empty": "No drafts in this case yet.",
+    "untitled": "Draft",
+    "edited": "Edited {date}",
+    "placeholder": "Start writing…",
+    "editorLabel": "Draft text",
+    "conflictPreserved": "An earlier version from another device was saved.",
+    "dismiss": "OK",
+    "professionalsOnly": "Drafts are for verified lawyers and judges.",
+    "save": {
+      "saved": "Saved",
+      "dirty": "Unsaved changes…",
+      "saving": "Saving…",
+      "error": "Couldn't save; will retry",
+      "retry": "Retry now"
+    },
+    "toolbar": {
+      "label": "Formatting",
+      "h1": "Heading 1",
+      "h2": "Heading 2",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "bullets": "Bulleted list",
+      "numbers": "Numbered list",
+      "quote": "Quote",
+      "undo": "Undo",
+      "redo": "Redo",
+      "micSoon": "Dictation is coming soon"
+    }
   }
 }

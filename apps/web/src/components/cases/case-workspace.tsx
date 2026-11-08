@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useState, type DragEvent, type KeyboardEvent } from 'react';
 import { DocumentCard } from '@/components/documents/document-card';
+import { DraftsTab } from '@/components/drafts/drafts-tab';
 import { UploadDialog } from '@/components/documents/upload-dialog';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import type { Me } from '@/lib/auth/store';
@@ -83,7 +84,7 @@ export function CaseWorkspace({ id, user, tab }: { id: string; user: Me; tab: st
       <section role="tabpanel" id={`panel-${active}`} aria-labelledby={`tab-${active}`}>
         {active === 'overview' && <Overview c={c} />}
         {active === 'documents' && <Documents id={id} />}
-        {active === 'drafts' && <Placeholder text={t('drafts.empty')} />}
+        {active === 'drafts' && <DraftsTab caseId={id} />}
         {active === 'conversation' && <Conversation id={id} />}
       </section>
     </div>
@@ -120,7 +121,7 @@ function Overview({ c }: { c: CaseFile }) {
     [t('fields.caseNumber'), c.case_number ?? dash],
     [t('fields.court'), c.court_or_thana ?? dash],
     [t('fields.offenseDate'), c.alleged_offense_date ? format.dateTime(new Date(`${c.alleged_offense_date}T00:00:00+06:00`), { dateStyle: 'long' }) : dash],
-    [t('fields.documents'), artifacts.data ? format.number(artifacts.data.length) : dash],
+    [t('fields.documents'), artifacts.data ? format.number(artifacts.data.filter((a) => a.artifact_type !== 'VOICE_DICTATION_DRAFT').length) : dash],
     [t('fields.updated'), format.dateTime(new Date(c.updated_at), { dateStyle: 'medium', timeStyle: 'short' })],
   ];
   return (
@@ -180,7 +181,8 @@ function Overview({ c }: { c: CaseFile }) {
 
 function Documents({ id }: { id: string }) {
   const t = useTranslations('cases.documents');
-  const { data, isPending, isError } = useArtifacts(id);
+  const { data: all, isPending, isError } = useArtifacts(id);
+  const data = all?.filter((a) => a.artifact_type !== 'VOICE_DICTATION_DRAFT');
   const [dialog, setDialog] = useState<{ file: File | null } | null>(null);
   const [dragging, setDragging] = useState(false);
   const onDrop = (e: DragEvent) => {
@@ -214,7 +216,7 @@ function Documents({ id }: { id: string }) {
         <p role="alert" className="text-red-700">
           {t('loadFailed')}
         </p>
-      ) : data.length === 0 ? (
+      ) : !data || data.length === 0 ? (
         <Placeholder text={t('empty')} />
       ) : (
         <ul className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)]">

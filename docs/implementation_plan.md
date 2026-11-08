@@ -217,7 +217,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **BE-33** Draft PATCH with last-write-wins + `artifact_revisions` preservation + `X-Conflict-Preserved` (TRD §5.4)
 - [ ] **BE-34** Export worker: `docx` builder + Playwright `page.pdf()` with Bangla fonts, presigned download, 24 h lifecycle (TRD §10) · Bangla rendering snapshot tests
 - [ ] **BE-35** GD templates + guided voice-fill API for Citizens (App Flow §11)
-- [ ] **WEB-10** TipTap draft editor + dictation mode (AudioWorklet 16 kHz PCM, interim decorations, corrections underlined with undo, autosave indicator) (App Flow §10)
+- [~] **WEB-10** TipTap draft editor + dictation mode (AudioWorklet 16 kHz PCM, interim decorations, corrections underlined with undo, autosave indicator) (App Flow §10)
 - [ ] **WEB-11** Export sheet (DOCX/PDF) + GD guided form (App Flow §11–12)
 
 ### Mobile
