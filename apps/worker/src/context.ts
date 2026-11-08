@@ -2,7 +2,7 @@ import { Redis } from 'ioredis';
 import { pino } from 'pino';
 import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
-import { QdrantChunkIndex, TeiEmbeddingProvider, createQdrantClient, notConfiguredOcr, statuteGenerationKey } from '@lawassist/providers';
+import { QdrantChunkIndex, TeiEmbeddingProvider, createLlmClient, createQdrantClient, notConfiguredOcr, statuteGenerationKey } from '@lawassist/providers';
 import { S3DocumentObjects } from './scan/objects';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
@@ -52,12 +52,21 @@ export function createWorkerContext() {
     log,
   };
 
+  // Stage 3 FIR extraction (TRD §7.6): key and relay URL from env only. Without a key, analysis
+  // jobs fail with LLM_NOT_CONFIGURED instead of hanging.
+  const llm = createLlmClient({
+    baseURL: cfg.ANTHROPIC_BASE_URL,
+    apiKey: cfg.ANTHROPIC_API_KEY,
+    models: { extraction: cfg.LLM_MODEL_EXTRACTION, assistant: cfg.LLM_MODEL_ASSISTANT },
+  });
+
   return {
     cfg,
     log,
     db,
     scrape,
     scan,
+    llm,
     qdrant,
     embedder,
     indexer,

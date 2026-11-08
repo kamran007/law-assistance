@@ -134,8 +134,8 @@ These items block engineering milestones. Start them in **Week 1**.
 **Goal:** an internal beta of the web assistant, with citations, conversations and the verifier (**M2**).
 
 ### AI & Assistant
-- [ ] **BE-08** `packages/providers/llm`: `createAnthropic({ baseURL, apiKey })` from env, model IDs from config, circuit breaker, timeouts/retries, telemetry with input/output recording off (TRD §7.6)
-- [ ] **BE-09** **Relay checks** (feeds decision D10): confirm `claude-opus-5-5` is accepted unchanged, prompt caching works (cache-read tokens > 0 on repeat), effort/thinking provider options are forwarded, added latency is measured · *Output:* short report in `docs/relay-verification.md`
+- [x] **BE-08** `packages/providers/llm`: `createAnthropic({ baseURL, apiKey })` from env, model IDs from config, circuit breaker, timeouts/retries, telemetry with input/output recording off (TRD §7.6)
+- [x] **BE-09** **Relay checks** (feeds decision D10): confirm `claude-opus-5-5` is accepted unchanged, prompt caching works (cache-read tokens > 0 on repeat), effort/thinking provider options are forwarded, added latency is measured · *Output:* short report in `docs/relay-verification.md`
 - [ ] **BE-10** Role system prompts v1 (CITIZEN / LAWYER / JUDGE) in `packages/prompts` — **LEGAL reviews**
 - [ ] **BE-11** Streaming citation validator (`TransformStream`, `[n]` buffering, invalid-marker stripping, flags, metrics) (TRD §7.4) · *Done when:* unit tests for split brackets and unknown refs pass
 - [x] **BE-12** Conversations API: general conversations CRUD, case conversation auto-created with each Lawyer/Judge case, Citizen blocked (TRD §4.2, §5.1)
@@ -179,7 +179,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [x] **BE-22** BullMQ scan flow stages 1–2: `qpdf` sanitization (from BE-21) + `pdftotext`/`pdftoppm`/`mammoth`/`sharp` pre-processing, Bijoy detection + converter (TRD §8.2)
 - [x] **DATA-11** Bijoy→Unicode converter in `packages/legal-text` with a test corpus of ≥ 200 strings
 - [x] **DATA-12** Section detector (Bangla/English patterns, letters, `302/34` expansion, Act dictionary, `act_inferred`) — ≥ 300 test strings (TRD §8.4)
-- [ ] **BE-23** Stage 3: `generateObject` FIR extraction with the Zod schema (TRD §8.3)
+- [x] **BE-23** Stage 3: `generateObject` FIR extraction with the Zod schema (TRD §8.3)
 - [x] **BE-24** Stages 4–5: Bangla/English date parser, delay calculation, detector merge, Schedule II join, `NOT_IN_VERIFIED_SCHEDULE` handling
 - [ ] **BE-25** Stage 6: role analyses (Citizen explanation / Lawyer ingredient audit / Judge charge matrix) with pinned sources + citation validation
 - [ ] **BE-26** Artifact status SSE (`/events`) via Redis pub/sub · field-correction PATCH + `/reanalyze` · push notification hook (FCM)

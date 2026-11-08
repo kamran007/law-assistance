@@ -85,6 +85,26 @@ const CONNECTOR_BEFORE = /^[\s,]*(?:আইন[^\n]{0,40}?)?(?:এর|র|ের|
 const ACT_WINDOW = 80;
 const CONNECTOR_BONUS = 60;
 
+/**
+ * Dhaka addresses use "Section" as a neighbourhood ("মিরপুর সেকশন-১১, ব্লক-গ", "House 5, Road 2,
+ * Section 6"). A group introduced by সেকশন / section with address words around it and no Act named
+ * nearby is an address, not a citation. ধারা and u/s are never used that way.
+ */
+const SECTION_WORD = /^(?:সেকশন|sections?\b|secs?\b)/iu;
+const ADDRESS_WORDS = /ব্লক|block|রোড|road|সড়ক|লেন|lane|এভিনিউ|avenue|বাড়ি|বাড়ী|বাসা|house|flat|ফ্ল্যাট|সেক্টর|sector|মিরপুর|mirpur|সাং|ঠিকানা|address|গ্রাম|village|ঘটনাস্থল/iu;
+const ADDRESS_WINDOW = 25;
+
+function looksLikeAddress(text: string, g: { start: number; end: number }): boolean {
+  // Both checks are anchored or plain alternations (linear) over short, bounded slices: the
+  // matched citation group and at most 2 × ADDRESS_WINDOW characters around it.
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- anchored alternation over the matched group
+  if (!SECTION_WORD.test(text.slice(g.start, g.end))) return false;
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- at most 2 × ADDRESS_WINDOW (25) chars
+  const around = text.slice(Math.max(0, g.start - ADDRESS_WINDOW), g.start) + ' ' + text.slice(g.end, g.end + ADDRESS_WINDOW);
+  // nosemgrep: ajinabraham.njsscan.dos.regex_dos.regex_dos -- input is at most 2 × ADDRESS_WINDOW (25) chars
+  return ADDRESS_WORDS.test(around);
+}
+
 interface ActMention {
   act: ActEntry;
   start: number;
@@ -169,6 +189,7 @@ export function detectSections(input: string, opts: DetectOptions = {}): Section
 
   for (const g of findGroups(text)) {
     const resolved = resolveAct(text, g.start, g.end, acts);
+    if (!resolved && looksLikeAddress(text, g)) continue; // "মিরপুর সেকশন-১১, ব্লক-গ"
     const act = resolved ?? fallback;
     const parts: { section: string; key: string; subsection: string | null }[] = [];
     ONE.lastIndex = 0;

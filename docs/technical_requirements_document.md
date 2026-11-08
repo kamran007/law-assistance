@@ -639,6 +639,8 @@ const { object } = await generateObject({
 
 ---
 
+**As built (BE-08 / BE-23, 2026-11-05).** `packages/providers/src/llm.ts` `createLlmClient` (`ai` 7.0.162 + `@ai-sdk/anthropic` 4.0.96, pinned). `generateObject` is deprecated in `ai` 7, so structured calls use `generateText` with `Output.object`; `structuredOutputMode: 'outputFormat'` sends the schema as native `output_config.format` (claude-opus-5-5 rejects forced tool use, sampling parameters and disabled thinking, so none are sent). Every call states `effort`; refusal fallbacks `fallbacks: 'default'` are on (switchable). The frozen system prompt goes in `instructions` with `cacheControl`. Telemetry has `recordInputs/recordOutputs: false`. Retries: AI SDK `maxRetries` 2; timeout 120 s; a small in-house circuit breaker (5 failures → open 30 s → one half-open trial; refusals and truncation do not count) instead of `opossum`. `finishReason` `content-filter` → `LlmRefusalError`, `length` → `LlmTruncatedError`. FIR extraction (`apps/worker/src/analysis/extract.ts`): §8.3 schema with fixed `field_confidence` keys (strict schemas allow no free records) plus `place_of_occurrence`; document wrapped in `<document>` as data; phone and NID numbers replaced before the call (`redactContactIds`); effort `medium`. The `analysis` queue consumer runs stages 3–5 and stores `structured_analysis` (v1 + FIR fields); until stage 6 exists the status goes to `READY`. Relay findings (it rewrites requests): `docs/relay-verification.md`.
+
 ## 8. Module B — FIR & Document Scan Pipeline
 
 ### 8.1 Upload Path

@@ -213,3 +213,24 @@ describe('corpus size', () => {
     expect(counted).toBe(HAND.length + GENERATED.length);
   });
 });
+
+describe('detectSections: Dhaka addresses that use "Section" (found by the live FIR test, BE-23)', () => {
+  const keys = (t: string) => detectSections(t, { defaultAct: 'PENAL_CODE' }).map((c) => `${c.act?.key}:${c.key}`);
+
+  it.each([
+    'ঘটনাস্থল: সেকশন-১১, ব্লক-গ, রোড নং-৪, পল্লবীপুর',
+    'সাং- বস্তি, সেকশন-১১, পল্লবীপুর।',
+    'মিরপুর সেকশন ১০ এ',
+    'House 5, Road 2, Section 6, Mirpur',
+    'Mirpur Section-2',
+  ])('is an address, not a citation: %s', (t) => {
+    expect(keys(t)).toEqual([]);
+  });
+
+  it('keeps real citations next to addresses, and "section" when an Act is named', () => {
+    expect(keys('Section 6 of the Penal Code at House 5')).toEqual(['PENAL_CODE:6']);
+    expect(keys('u/s 323 PC, House 5 Road 2')).toEqual(['PENAL_CODE:323']);
+    expect(keys('সেকশন ৪২০ দণ্ডবিধি, ঠিকানা মিরপুর')).toEqual(['PENAL_CODE:420']);
+    expect(keys('সাং মিরপুর, আসামী ধারা ৩২৩ এর অপরাধ')).toEqual(['PENAL_CODE:323']);
+  });
+});

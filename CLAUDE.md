@@ -43,9 +43,10 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 ```
 apps/api          Fastify API
 apps/worker       BullMQ worker: scraper (src/scrape, see README there), vector indexing (src/index),
-                  scan pipeline (src/scan; needs qpdf + Poppler, see apps/worker/Dockerfile)
+                  scan pipeline (src/scan; needs qpdf + Poppler, see apps/worker/Dockerfile),
+                  analysis stages 3–5 (src/analysis: LLM FIR extraction, dates, sections, Schedule II)
 packages/config   Zod env loader
-packages/providers  TEI embedding client, Qdrant chunk index (vendor interfaces)
+packages/providers  TEI embedding client, Qdrant chunk index, LLM client (src/llm.ts), queue names
 packages/db       Drizzle schema, migrations, scoped repos, grants.sql
 packages/legal-text  Bangla/English normalization, section keys, hashing
 docs/             Specs and implementation plan
