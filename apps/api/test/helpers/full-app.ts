@@ -65,6 +65,7 @@ export async function startFullApp(opts: { today?: string } = {}): Promise<FullA
     statutes: { repo: new StatutesRepository(db), cache: noCache, authenticate, today },
     auth: { service: new AuthService({ db, tokens, sender: { send: async () => undefined }, otpKey: 'k'.repeat(32) }), authenticate, secureCookies: true },
     cases: { db, authenticate, today },
+    devices: { db, authenticate },
     conversations: { db, authenticate },
     documents: {
       db,

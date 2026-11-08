@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, int, mysqlEnum, mysqlTable, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
 import { dt, timestamps, uuidBin } from './columns';
-import { CREDENTIAL_DECISIONS, LANGUAGES, OTP_CHANNELS, USER_ROLES, VERIFICATION_STATUSES } from './enums';
+import { CREDENTIAL_DECISIONS, DEVICE_PLATFORMS, LANGUAGES, OTP_CHANNELS, USER_ROLES, VERIFICATION_STATUSES } from './enums';
 
 /** SRS 5.1 + TRD §4.2 additions. */
 export const users = mysqlTable(
@@ -68,3 +68,24 @@ export const credentialReviews = mysqlTable('credential_reviews', {
   note: varchar('note', { length: 500 }),
   createdAt: dt('created_at').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });
+
+/**
+ * FCM registration tokens (BE-26 push). A token identifies one app install; it belongs to whoever
+ * signed in on that device last, so registering a known token moves it to the caller. Read and
+ * written only through `scoped(db, userId).devices`.
+ */
+export const deviceTokens = mysqlTable(
+  'device_tokens',
+  {
+    deviceTokenId: uuidBin('device_token_id').primaryKey(),
+    userId: uuidBin('user_id')
+      .notNull()
+      .references(() => users.userId, { onDelete: 'cascade' }),
+    /** ascii_bin in migration 0002: tokens are case-sensitive. */
+    token: varchar('token', { length: 512 }).notNull(),
+    platform: mysqlEnum('platform', DEVICE_PLATFORMS).notNull(),
+    lastSeenAt: dt('last_seen_at').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    createdAt: dt('created_at').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [uniqueIndex('uq_device_token').on(t.token), index('ix_device_user').on(t.userId, t.lastSeenAt)],
+);

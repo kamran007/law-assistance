@@ -51,6 +51,13 @@ export const envSchema = z.object({
   LLM_MODEL_ASSISTANT: z.string().default('claude-opus-5-5'),
   LLM_MODEL_EXTRACTION: z.string().default('claude-opus-5-5'),
 
+  /**
+   * Push notifications (FCM HTTP v1): a Firebase service-account JSON key, either inline (as
+   * Secrets Manager injects it) or as a file path. Unset = push is off; documents still finish.
+   */
+  FCM_SERVICE_ACCOUNT_JSON: z.preprocess(emptyToUndefined, z.string().optional()),
+  FCM_SERVICE_ACCOUNT_FILE: z.preprocess(emptyToUndefined, z.string().optional()),
+
   /** ES256 PEM keys (`\n`-escaped in env files). Development generates a throwaway pair if unset. */
   JWT_PRIVATE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   JWT_PUBLIC_KEY: z.preprocess(emptyToUndefined, z.string().optional()),

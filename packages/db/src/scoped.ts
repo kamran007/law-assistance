@@ -1,6 +1,9 @@
-import { and, asc, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { caseArtifacts, caseFiles, conversations, messages, newId } from './schema/index';
+import { caseArtifacts, caseFiles, conversations, deviceTokens, messages, newId, type DEVICE_PLATFORMS } from './schema/index';
+
+export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
+export const MAX_DEVICES_PER_USER = 10;
 import type { MessageCitation } from './schema/index';
 
 /**
@@ -373,8 +376,45 @@ export function scoped(db: Db, userId: string) {
     },
   };
 
+  const devicesRepo = {
+    /**
+     * Registers (or refreshes) this user's FCM token. A token already registered by another user is
+     * moved to this one: the caller holds the token, so the device is theirs now and the previous
+     * account must stop getting its notifications. Keeps at most MAX_DEVICES_PER_USER, newest first.
+     */
+    async register(token: string, platform: DevicePlatform): Promise<void> {
+      await db
+        .insert(deviceTokens)
+        .values({ deviceTokenId: newId(), userId, token, platform })
+        .onDuplicateKeyUpdate({ set: { userId, platform, lastSeenAt: sql`CURRENT_TIMESTAMP(3)` } });
+      const stale = await db
+        .select({ id: deviceTokens.deviceTokenId })
+        .from(deviceTokens)
+        .where(eq(deviceTokens.userId, userId))
+        .orderBy(desc(deviceTokens.lastSeenAt), desc(deviceTokens.deviceTokenId))
+        .offset(MAX_DEVICES_PER_USER)
+        .limit(1000);
+      if (stale.length) await db.delete(deviceTokens).where(and(eq(deviceTokens.userId, userId), inArray(deviceTokens.deviceTokenId, stale.map((s) => s.id))));
+    },
+
+    async list(): Promise<{ token: string; platform: DevicePlatform }[]> {
+      return db
+        .select({ token: deviceTokens.token, platform: deviceTokens.platform })
+        .from(deviceTokens)
+        .where(eq(deviceTokens.userId, userId))
+        .orderBy(desc(deviceTokens.lastSeenAt));
+    },
+
+    /** Removes one of this user's tokens (sign-out, or FCM reported it invalid). */
+    async remove(token: string): Promise<boolean> {
+      const [res] = await db.delete(deviceTokens).where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.token, token)));
+      return res.affectedRows > 0;
+    },
+  };
+
   return {
     userId,
+    devices: devicesRepo,
     caseFiles: caseFilesRepo,
     conversations: conversationsRepo,
     messages: messagesRepo,

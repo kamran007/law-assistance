@@ -10,3 +10,7 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Service-account keys (FCM etc.) are secrets
+secrets/
+*firebase-adminsdk*.json

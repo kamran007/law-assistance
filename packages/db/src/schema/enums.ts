@@ -2,6 +2,7 @@
 export const USER_ROLES = ['CITIZEN', 'LAWYER', 'JUDGE', 'ADMIN'] as const;
 export const VERIFICATION_STATUSES = ['NOT_REQUIRED', 'PENDING', 'VERIFIED', 'REJECTED'] as const;
 export const LANGUAGES = ['BN', 'EN'] as const;
+export const DEVICE_PLATFORMS = ['ANDROID', 'IOS', 'WEB'] as const;
 
 export const STATUTE_STATUSES = ['ACTIVE', 'REPEALED'] as const;
 export const VALID_FROM_SOURCES = ['AMENDMENT_FOOTNOTE', 'ENACTMENT_DATE', 'DETECTED_ON_SYNC'] as const;

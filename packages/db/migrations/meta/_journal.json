@@ -15,6 +15,13 @@
       "when": 1793707243861,
       "tag": "0001_fulltext_and_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794116433558,
+      "tag": "0002_device_tokens",
+      "breakpoints": true
     }
   ]
 }

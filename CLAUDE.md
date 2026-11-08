@@ -46,7 +46,8 @@ apps/worker       BullMQ worker: scraper (src/scrape, see README there), vector 
                   scan pipeline (src/scan; needs qpdf + Poppler, see apps/worker/Dockerfile),
                   analysis stages 3–5 (src/analysis: LLM FIR extraction, dates, sections, Schedule II)
 packages/config   Zod env loader
-packages/providers  TEI embedding client, Qdrant chunk index, LLM client (src/llm.ts), queue names
+packages/providers  TEI embedding client, Qdrant chunk index, LLM client (src/llm.ts), queue names,
+                  status events (src/artifact-events.ts), FCM push (src/fcm.ts)
 packages/db       Drizzle schema, migrations, scoped repos, grants.sql
 packages/legal-text  Bangla/English normalization, section keys, hashing
 docs/             Specs and implementation plan

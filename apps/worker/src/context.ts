@@ -8,10 +8,10 @@ import {
   TeiEmbeddingProvider,
   createLlmClient,
   createQdrantClient,
-  noopPushNotifier,
   notConfiguredOcr,
   statuteGenerationKey,
 } from '@lawassist/providers';
+import { createPushNotifier } from './push';
 import { S3DocumentObjects } from './scan/objects';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
@@ -52,10 +52,11 @@ export function createWorkerContext() {
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
 
   // Scan pipeline (TRD §8.2): user data, so it runs on the app_worker connection through scoped().
-  // Status events for the API's SSE relay (TRD §8.1 step 4). Push via FCM arrives with the
-  // mobile app (Firebase credentials + device tokens); until then the hook is a no-op.
+  // Status events for the API's SSE relay (TRD §8.1 step 4); push via FCM when a Firebase
+  // service-account key is configured (FCM_SERVICE_ACCOUNT_*), otherwise a no-op.
   const events = new RedisArtifactEventPublisher(redis);
-  const push = noopPushNotifier;
+  const { push, enabled: pushEnabled } = createPushNotifier(cfg, db);
+  log.info({ pushEnabled }, 'push notifications');
 
   const scan = {
     db,

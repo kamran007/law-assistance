@@ -17,6 +17,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.users              TO 'app_api
 GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.otp_challenges     TO 'app_api'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.refresh_tokens     TO 'app_api'@'%';
 GRANT SELECT, INSERT                 ON lawassist.credential_reviews TO 'app_api'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.device_tokens      TO 'app_api'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.case_files         TO 'app_api'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.case_artifacts     TO 'app_api'@'%';
 GRANT SELECT, INSERT, DELETE         ON lawassist.artifact_revisions TO 'app_api'@'%';
@@ -34,6 +35,8 @@ GRANT INSERT         ON lawassist.outbox_events  TO 'app_api'@'%';
 
 -- ── app_worker (scan pipeline, exports, outbox, notifications) ─────────────
 GRANT SELECT ON lawassist.users                  TO 'app_worker'@'%';
+-- Push: reads the owner's FCM tokens, deletes ones FCM reports as no longer registered.
+GRANT SELECT, DELETE ON lawassist.device_tokens  TO 'app_worker'@'%';
 GRANT SELECT, UPDATE ON lawassist.case_files     TO 'app_worker'@'%';
 GRANT SELECT, UPDATE ON lawassist.case_artifacts TO 'app_worker'@'%';
 GRANT SELECT, UPDATE ON lawassist.conversations  TO 'app_worker'@'%';

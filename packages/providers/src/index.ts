@@ -51,3 +51,4 @@ export {
   type PushNotifier,
 } from './artifact-events';
 export { FirCorrectionsSchema, REANALYSIS_FIELDS, FIR_FIELDS, type FirCorrections, type StoredCorrections } from './fir-corrections';
+export { FcmPushNotifier, FcmSendError, parseServiceAccount, PUSH_TEXT, FCM_SCOPE, type ServiceAccount, type PushTokenStore, type FcmOptions } from './fcm';

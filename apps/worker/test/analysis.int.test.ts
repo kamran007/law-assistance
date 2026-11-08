@@ -1,9 +1,11 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import { createDb, crpcScheduleMetadata, newId, runMigrations, scoped, statutes, statuteSections, users, type CaseArtifact, type Db } from '@lawassist/db';
-import { CircuitBreaker, LlmNotConfiguredError, LlmRefusalError, MemoryArtifactEvents, type LlmClient, type StructuredRequest } from '@lawassist/providers';
+import { CircuitBreaker, FcmPushNotifier, LlmNotConfiguredError, LlmRefusalError, MemoryArtifactEvents, PUSH_TEXT, parseServiceAccount, type LlmClient, type StructuredRequest } from '@lawassist/providers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FirExtraction } from '../src/analysis/extract';
 import { processAnalysisJob, type RoleAnalysisRecord, type StoredAnalysis } from '../src/analysis/job';
+import { dbPushTokenStore } from '../src/push';
 
 /**
  * Analysis queue consumer (BE-23, BE-24, BE-25) against MySQL 8.4 (Testcontainers, needs Docker)
@@ -320,5 +322,36 @@ describe('status events and reanalysis (BE-26)', () => {
     expect(s.filingDelay.minutes).toBe(900); // 19:00 → next day 10:00
     expect(s.corrections).toMatchObject({ needsReanalysis: false, fields: ['occurrence_datetime', 'cited_sections'] });
     expect(s.fir.police_station).toBe('মিরপুর মডেল'); // untouched fields survive
+  });
+});
+
+describe('FCM push through the device registry (BE-26 push)', () => {
+  it('sends the owner a content-free push in their language and drops tokens FCM reports as unregistered', async () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const serviceAccount = parseServiceAccount(
+      JSON.stringify({ type: 'service_account', project_id: 'lawassist-test', client_email: 'push@lawassist-test.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() }),
+    );
+    await scoped(db, lawyer).devices.register('live-token-0123456789', 'ANDROID');
+    await scoped(db, lawyer).devices.register('dead-token-0123456789', 'IOS');
+    await scoped(db, citizen).devices.register('citizen-token-0123456789', 'ANDROID');
+    const sent: { token: string; notification: { title: string }; data: Record<string, string> }[] = [];
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      if (url.includes('oauth2')) return Response.json({ access_token: 'at', expires_in: 3600 });
+      const { message } = JSON.parse(String(init.body));
+      sent.push(message);
+      return message.token.startsWith('dead')
+        ? Response.json({ error: { status: 'NOT_FOUND', details: [{ errorCode: 'UNREGISTERED' }] } }, { status: 404 })
+        : Response.json({ name: 'projects/lawassist-test/messages/1' });
+    }) as unknown as typeof fetch;
+    const push = new FcmPushNotifier({ serviceAccount, store: dbPushTokenStore(db), fetch: fakeFetch });
+
+    const job = await extractedDoc(lawyer);
+    await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet, push }, job);
+
+    expect(sent.map((m) => m.token).sort()).toEqual(['dead-token-0123456789', 'live-token-0123456789']); // the owner's devices only
+    expect(sent[0]).toMatchObject({ notification: PUSH_TEXT.EN.READY, data: { type: 'DOCUMENT_FINISHED', artifact_id: job.artifactId, status: 'READY' } });
+    expect(JSON.stringify(sent)).not.toMatch(/করিম|রহিম|৩২৩|323/);
+    expect(await scoped(db, lawyer).devices.list()).toEqual([{ token: 'live-token-0123456789', platform: 'ANDROID' }]);
+    expect(await scoped(db, citizen).devices.list()).toHaveLength(1);
   });
 });

@@ -57,6 +57,7 @@ const app = await buildApp(config, {
     secureCookies: !dev,
   },
   cases: { db, authenticate, today: dhakaToday },
+  devices: { db, authenticate },
   conversations: { db, authenticate },
   documents: {
     db,

@@ -183,6 +183,20 @@ describe('app_api: application DML, read-only law, no DDL', () => {
   });
 });
 
+describe('device_tokens (push): API registers, worker reads and prunes', () => {
+  it('app_api registers, app_worker lists and deletes but cannot insert, app_scraper is refused', async () => {
+    const userId = newId();
+    await conns.app_api.db.insert(users).values({ userId, fullName: 'Push', contactIdentifier: '+8801700000077' });
+    await scoped(conns.app_api.db, userId).devices.register('tok-A', 'ANDROID');
+    await scoped(conns.app_api.db, userId).devices.register('tok-A', 'ANDROID'); // refresh, same row
+    const worker = scoped(conns.app_worker.db, userId).devices;
+    expect(await worker.list()).toEqual([{ token: 'tok-A', platform: 'ANDROID' }]);
+    expect(await worker.remove('tok-A')).toBe(true);
+    await expectDenied(worker.register('tok-B', 'IOS'));
+    await expectDenied(conns.app_scraper.db.execute(sql`SELECT * FROM device_tokens`));
+  });
+});
+
 describe('app_migrate: DDL only inside the app schema', () => {
   it('can create and drop tables in lawassist', async () => {
     await conns.app_migrate.db.execute(sql`CREATE TABLE grants_probe (id INT PRIMARY KEY)`);
