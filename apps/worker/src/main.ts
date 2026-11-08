@@ -9,7 +9,9 @@ import { BullAnalysisQueue } from './scan/objects';
 import { markFailedAfterRetries, processScanJob } from './scan/pipeline';
 import { runScrape } from './scrape/run-scrape';
 import { runScobCrawl } from './scob/crawl';
-import { SCOB_QUEUE } from '@lawassist/providers';
+import { processScobJudgment } from './scob/process';
+import { scobJudgmentJobSchema } from './scob/queue';
+import { SCOB_JUDGMENT_QUEUE, SCOB_QUEUE } from '@lawassist/providers';
 
 /**
  * Worker process (TRD §3.1). Queues:
@@ -73,6 +75,13 @@ async function main() {
     lockDuration: 10 * 60_000,
   });
 
+  // One judgment at a time: downloads share the SCOB host limiter (TRD §6A.3).
+  const scobJudgmentWorker = new Worker(SCOB_JUDGMENT_QUEUE, async (job) => processScobJudgment(ctx.scobProcess, scobJudgmentJobSchema.parse(job.data)), {
+    connection,
+    concurrency: 1,
+    lockDuration: 5 * 60_000,
+  });
+
   const outboxQueue = new Queue(OUTBOX_QUEUE, { connection });
   await outboxQueue.upsertJobScheduler(
     'outbox-drain',
@@ -124,6 +133,7 @@ async function main() {
   for (const [name, w] of [
     ['scrape', scrapeWorker],
     ['scob', scobWorker],
+    ['scob-judgment', scobJudgmentWorker],
     ['outbox', outboxWorker],
     ['scan', scanWorker],
     ['analysis', analysisWorker],
@@ -134,7 +144,7 @@ async function main() {
 
   const shutdown = async () => {
     ctx.log.info({}, 'shutting down');
-    await Promise.all([scrapeWorker.close(), scobWorker.close(), outboxWorker.close(), scanWorker.close(), analysisWorker.close()]);
+    await Promise.all([scrapeWorker.close(), scobWorker.close(), scobJudgmentWorker.close(), outboxWorker.close(), scanWorker.close(), analysisWorker.close()]);
     await Promise.all([scrapeQueue.close(), scobQueue.close(), outboxQueue.close(), analysis.close()]);
     await ctx.close();
     process.exit(0);

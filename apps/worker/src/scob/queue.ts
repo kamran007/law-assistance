@@ -1,5 +1,6 @@
 import { SCOB_JUDGMENT_JOB, SCOB_JUDGMENT_QUEUE } from '@lawassist/providers';
 import { Queue, type ConnectionOptions } from 'bullmq';
+import { z } from 'zod';
 import { judgmentJobId, type ScobJudgmentJob, type ScobJudgmentQueue } from './crawl';
 
 /**
@@ -28,3 +29,24 @@ export class BullScobJudgmentQueue implements ScobJudgmentQueue {
     return this.queue.close();
   }
 }
+
+/** Validates a `scob-judgment` payload before processing (it comes from Redis, not from code). */
+export const scobJudgmentJobSchema = z.object({
+  row: z.object({
+    issue: z.number().int().positive(),
+    division: z.enum(['AD', 'HCD']),
+    serial: z.number().int().positive(),
+    parties: z.string(),
+    authoringJudge: z.string().nullable(),
+    citation: z.string().nullable(),
+    caseNumber: z.string().nullable(),
+    keyWords: z.string(),
+    summary: z.string().nullable(),
+    keyRatio: z.string(),
+    keyRatioParagraphs: z.array(z.string()),
+    pdfUrl: z.string().url().refine((u) => u.startsWith('https://www.supremecourt.gov.bd/'), 'SCOB PDFs only'),
+  }),
+  issueYear: z.number().int().nullable(),
+  listingSnapshotKey: z.string(),
+  force: z.boolean(),
+});

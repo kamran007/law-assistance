@@ -16,6 +16,7 @@ import { S3DocumentObjects } from './scan/objects';
 import { BullScobJudgmentQueue } from './scob/queue';
 import { SCOB_SOURCE_CONFIG } from './scob/source-config';
 import type { ScobCrawlDeps } from './scob/crawl';
+import type { ScobProcessDeps } from './scob/process';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
 import { PoliteHttpClient } from './scrape/http-client';
@@ -61,6 +62,14 @@ export function createWorkerContext() {
     log,
   };
 
+  const scobProcess: ScobProcessDeps = {
+    db: scob.db,
+    http: scob.http, // same client: one limiter for the host
+    tools: new CliDocumentTools(),
+    objects: S3DocumentObjects.fromConfig(cfg),
+    log,
+  };
+
   const qdrant = createQdrantClient({ url: cfg.QDRANT_URL, apiKey: cfg.QDRANT_API_KEY });
   const embedder = new TeiEmbeddingProvider({ url: cfg.TEI_EMBED_URL, model: cfg.EMBEDDING_MODEL });
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
@@ -97,6 +106,7 @@ export function createWorkerContext() {
     db,
     scrape,
     scob,
+    scobProcess,
     scan,
     llm,
     events,

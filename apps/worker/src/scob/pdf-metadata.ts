@@ -5,6 +5,10 @@
  * (seen in 20 SCOB AD-3, JUD-01).
  */
 export interface JudgmentHeader {
+  /** From the running head of page 1 ("Begum Khaleda Zia & ors vs The State & anr"); null if not found. */
+  parties: string | null;
+  /** "(Syed Refaat Ahmed, CJ)" in the running head, without parentheses. */
+  authoringJudge: string | null;
   /** "20 SCOB [2025] AD" from the running head of page 1, normalised spacing; null if absent. */
   citation: string | null;
   /** ISO date, or null when not found. */
@@ -73,7 +77,24 @@ export function parseJudgmentHeader(layoutText: string): JudgmentHeader {
     }
   }
   const cite = /(\d+)\s*SCOB\s*\[\s*(\d{4})\s*\]\s*(AD|HCD|HD)\b/i.exec(layoutText);
+
+  // Running head of page 1: "<citation> <parties> (<Judge>, J)", over one to four lines.
+  const head: string[] = [];
+  for (const l of lines.map((x) => x.trim()).filter(Boolean).slice(0, 6)) {
+    head.push(l);
+    if (/\([^()]*,\s*(?:CJ|J|JJ)\.?\)/.test(l)) break;
+  }
+  const headText = head.join(' ').replace(/\s+/g, ' ');
+  const judgeMatch = /\(([^()]*?,\s*(?:CJ|J|JJ)\.?)\)/.exec(headText);
+  let parties: string | null = null;
+  if (judgeMatch) {
+    const before = headText.slice(0, judgeMatch.index).replace(/^\s*\d+\s*SCOB\s*\[\s*\d{4}\s*\]\s*(?:AD|HCD|HD)\b(?:\s*\d+\b)?/i, '').trim();
+    if (/\bv(?:s|ersus)?\.?\s/i.test(before)) parties = before;
+  }
+
   return {
+    parties,
+    authoringJudge: judgeMatch ? judgeMatch[1]!.trim() : null,
     citation: cite ? `${cite[1]} SCOB [${cite[2]}] ${cite[3]!.toUpperCase() === 'HD' ? 'HCD' : cite[3]!.toUpperCase()}` : null,
     // The judgment date is never before the last hearing; take the latest date on that line.
     decisionDate: judgmentDates.length ? [...judgmentDates].sort().at(-1)! : null,

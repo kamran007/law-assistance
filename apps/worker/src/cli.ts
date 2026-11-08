@@ -4,6 +4,10 @@ import { ensureChunkCollection, reindexAll } from './index/collection';
 import { drainOutbox } from './index/outbox';
 import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
 import { runScobCrawl } from './scob/crawl';
+import { decodeMixedUtf8 } from './scob/decode';
+import { parseDivisionList, parseIndex } from './scob/list-parser';
+import { processScobJudgment } from './scob/process';
+import { SCOB_SOURCE_CONFIG } from './scob/source-config';
 
 /**
  * Manual runs (no queue):
@@ -14,6 +18,7 @@ import { runScobCrawl } from './scob/crawl';
  *   scrape -- --reindex-all [--keep-previous]           rebuild the collection, swap the alias
  *   scrape -- --scob [--issues 19,20] [--all]           SCOB crawl: queue judgments not stored yet (all with --all)
  *   scrape -- --scob-backfill                           first full SCOB load (every issue)
+ *   scrape -- --scob-judgment 20/AD/1 [--force]         process one judgment now (no queue)
  * SCOB runs fetch the live Supreme Court site: check PRE-11 (site terms) before a production run.
  */
 const { values } = parseArgs({
@@ -31,6 +36,7 @@ const { values } = parseArgs({
     'keep-previous': { type: 'boolean', default: false },
     scob: { type: 'boolean', default: false },
     'scob-backfill': { type: 'boolean', default: false },
+    'scob-judgment': { type: 'string' },
     issues: { type: 'string' },
     all: { type: 'boolean', default: false },
   },
@@ -50,6 +56,17 @@ try {
         { keepPrevious: values['keep-previous'] },
       ),
     );
+  } else if (values['scob-judgment']) {
+    const [issue, division, serial] = values['scob-judgment'].split('/');
+    if (division !== 'AD' && division !== 'HCD') throw new Error('--scob-judgment needs issue/AD|HCD/serial, e.g. 20/AD/1');
+    const index = parseIndex(decodeMixedUtf8((await ctx.scob.http.getBytes(new URL(SCOB_SOURCE_CONFIG.indexPath, SCOB_SOURCE_CONFIG.baseUrl).toString(), 'text/html')).bytes));
+    const entry = index.find((i) => i.issue === Number(issue));
+    const listUrl = entry?.lists[division];
+    if (!entry || !listUrl) throw new Error(`Issue ${issue} ${division} not on the SCOB index`);
+    const rows = parseDivisionList(decodeMixedUtf8((await ctx.scob.http.getBytes(listUrl, 'text/html')).bytes), { issue: Number(issue), division });
+    const row = rows.find((r) => r.serial === Number(serial));
+    if (!row) throw new Error(`No serial ${serial} in issue ${issue} ${division}`);
+    print(await processScobJudgment(ctx.scobProcess, { row, issueYear: entry.year, listingSnapshotKey: 'manual', force: values.force }));
   } else if (values.scob || values['scob-backfill']) {
     const issues = values.issues?.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
     const summary = await runScobCrawl(ctx.scob, { kind: values['scob-backfill'] ? 'BACKFILL' : 'MANUAL', ...(issues?.length ? { issues } : {}), all: values.all });
