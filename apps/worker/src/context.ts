@@ -4,6 +4,7 @@ import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
 import {
   QdrantChunkIndex,
+  QdrantJudgmentIndex,
   RedisArtifactEventPublisher,
   TeiEmbeddingProvider,
   createLlmClient,
@@ -19,6 +20,7 @@ import type { ScobCrawlDeps } from './scob/crawl';
 import type { ScobProcessDeps } from './scob/process';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
+import { JudgmentIndexer } from './index/judgment-indexer';
 import { PoliteHttpClient } from './scrape/http-client';
 import { RedisConditionalCache } from './scrape/redis-conditional-cache';
 import type { ScrapeDeps } from './scrape/run-scrape';
@@ -73,6 +75,7 @@ export function createWorkerContext() {
   const qdrant = createQdrantClient({ url: cfg.QDRANT_URL, apiKey: cfg.QDRANT_API_KEY });
   const embedder = new TeiEmbeddingProvider({ url: cfg.TEI_EMBED_URL, model: cfg.EMBEDDING_MODEL });
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
+  const judgmentIndexer = new JudgmentIndexer({ db, embedder, index: new QdrantJudgmentIndex(qdrant, cfg.QDRANT_JUDGMENT_COLLECTION) });
 
   // Scan pipeline (TRD §8.2): user data, so it runs on the app_worker connection through scoped().
   // Status events for the API's SSE relay (TRD §8.1 step 4); push via FCM when a Firebase
@@ -114,6 +117,7 @@ export function createWorkerContext() {
     qdrant,
     embedder,
     indexer,
+    judgmentIndexer,
     async close() {
       await closeDb();
       await scraperDb?.close();

@@ -92,7 +92,7 @@ export function chunkSection(input: ChunkInput, opts: ChunkOptions = {}): string
 }
 
 /** Splits an over-long paragraph at sentence ends, then at word boundaries as a last resort. */
-function splitLong(line: string, budget: number, est: (t: string) => number): string[] {
+export function splitLong(line: string, budget: number, est: (t: string) => number): string[] {
   const out: string[] = [];
   let cur = '';
   const push = (piece: string) => {

@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { outboxEvents, type Db } from '@lawassist/db';
 import type { Log } from '../scrape/run-scrape';
 import type { SectionIndexer } from './indexer';
+import type { JudgmentIndexer } from './judgment-indexer';
 
 /**
  * Outbox consumer for the vector index (TRD §4.4, §6.4).
@@ -13,7 +14,16 @@ import type { SectionIndexer } from './indexer';
  * Run with a single consumer (BullMQ concurrency 1). A second consumer would only duplicate work.
  */
 export const INDEX_EVENT_TYPES = ['SECTION_VERSION_CREATED', 'SECTION_VERSION_CLOSED', 'STATUTE_STATUS_CHANGED'] as const;
+/** Case law (JUD-06): handled when a judgment indexer is configured. */
+export const JUDGMENT_EVENT_TYPES = ['JUDGMENT_UPSERTED', 'JUDGMENT_REMOVED'] as const;
 export const MAX_ATTEMPTS = 10;
+
+export interface OutboxDeps {
+  db: Db;
+  indexer: SectionIndexer;
+  judgments?: JudgmentIndexer;
+  log: Log;
+}
 
 export interface OutboxRunResult {
   processed: number;
@@ -25,14 +35,14 @@ export interface OutboxRunResult {
 type Event = { id: number; aggregateId: string; eventType: string; attempts: number };
 
 export async function processOutboxBatch(
-  deps: { db: Db; indexer: SectionIndexer; log: Log },
+  deps: OutboxDeps,
   opts: { batchSize?: number } = {},
 ): Promise<OutboxRunResult> {
   const batchSize = opts.batchSize ?? 100;
   const events: Event[] = await deps.db
     .select({ id: outboxEvents.id, aggregateId: outboxEvents.aggregateId, eventType: outboxEvents.eventType, attempts: outboxEvents.attempts })
     .from(outboxEvents)
-    .where(and(isNull(outboxEvents.processedAt), inArray(outboxEvents.eventType, [...INDEX_EVENT_TYPES]), lt(outboxEvents.attempts, MAX_ATTEMPTS)))
+    .where(and(isNull(outboxEvents.processedAt), inArray(outboxEvents.eventType, [...INDEX_EVENT_TYPES, ...(deps.judgments ? JUDGMENT_EVENT_TYPES : [])]), lt(outboxEvents.attempts, MAX_ATTEMPTS)))
     .orderBy(asc(outboxEvents.id))
     .limit(batchSize);
   if (!events.length) return { processed: 0, failed: 0, more: false };
@@ -59,10 +69,30 @@ export async function processOutboxBatch(
     }
   }
 
-  // 2. Payload-only events. Order relative to step 1 doesn't matter: both write MySQL truth.
-  for (const e of events.filter((ev) => ev.eventType !== 'SECTION_VERSION_CREATED')) {
+  // 1b. Judgments (re-read from MySQL; batch first, then one by one).
+  const judgmentIndexer = deps.judgments;
+  const upserted = events.filter((e) => e.eventType === 'JUDGMENT_UPSERTED');
+  if (judgmentIndexer && upserted.length) {
     try {
-      if (e.eventType === 'SECTION_VERSION_CLOSED') await deps.indexer.refreshSectionPayload(e.aggregateId);
+      await judgmentIndexer.indexJudgments(upserted.map((e) => e.aggregateId));
+      done.push(...upserted.map((e) => e.id));
+    } catch {
+      for (const e of upserted) {
+        try {
+          await judgmentIndexer.indexJudgments([e.aggregateId]);
+          done.push(e.id);
+        } catch (err) {
+          failures.push({ id: e.id, error: describe(err) });
+        }
+      }
+    }
+  }
+
+  // 2. Payload-only events. Order relative to step 1 doesn't matter: both write MySQL truth.
+  for (const e of events.filter((ev) => ev.eventType !== 'SECTION_VERSION_CREATED' && ev.eventType !== 'JUDGMENT_UPSERTED')) {
+    try {
+      if (e.eventType === 'JUDGMENT_REMOVED') await judgmentIndexer!.remove(e.aggregateId);
+      else if (e.eventType === 'SECTION_VERSION_CLOSED') await deps.indexer.refreshSectionPayload(e.aggregateId);
       else await deps.indexer.refreshStatutePayload(e.aggregateId);
       done.push(e.id);
     } catch (err) {
@@ -87,7 +117,7 @@ export async function processOutboxBatch(
 
 /** Drains the outbox until empty or `maxBatches` is reached (one BullMQ job run). */
 export async function drainOutbox(
-  deps: { db: Db; indexer: SectionIndexer; log: Log },
+  deps: OutboxDeps,
   opts: { batchSize?: number; maxBatches?: number } = {},
 ): Promise<{ processed: number; failed: number }> {
   let processed = 0;

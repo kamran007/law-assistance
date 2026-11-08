@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import { createWorkerContext } from './context';
-import { ensureChunkCollection, reindexAll } from './index/collection';
+import { ensureChunkCollection, ensureJudgmentCollection, reindexAll, reindexJudgments } from './index/collection';
 import { drainOutbox } from './index/outbox';
 import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
 import { runScobCrawl } from './scob/crawl';
@@ -17,6 +17,7 @@ import { relinkJudgments } from './scob/statute-links';
  *   scrape -- --setup-index                             create Qdrant collection + alias + payload indexes
  *   scrape -- --drain-outbox                            embed/index pending outbox events now
  *   scrape -- --reindex-all [--keep-previous]           rebuild the collection, swap the alias
+ *   scrape -- --reindex-judgments [--keep-previous]     rebuild judgment_chunks from MySQL (SCOB backfill), swap the alias
  *   scrape -- --scob [--issues 19,20] [--all]           SCOB crawl: queue judgments not stored yet (all with --all)
  *   scrape -- --scob-backfill                           first full SCOB load (every issue)
  *   scrape -- --scob-judgment 20/AD/1 [--force]         process one judgment now (no queue)
@@ -35,6 +36,7 @@ const { values } = parseArgs({
     'setup-index': { type: 'boolean', default: false },
     'drain-outbox': { type: 'boolean', default: false },
     'reindex-all': { type: 'boolean', default: false },
+    'reindex-judgments': { type: 'boolean', default: false },
     'keep-previous': { type: 'boolean', default: false },
     scob: { type: 'boolean', default: false },
     'scob-backfill': { type: 'boolean', default: false },
@@ -49,9 +51,19 @@ const ctx = createWorkerContext();
 const print = (v: unknown) => console.log(JSON.stringify(v, null, 2));
 try {
   if (values['setup-index']) {
-    print({ collection: await ensureChunkCollection(ctx.qdrant, ctx.cfg.QDRANT_COLLECTION, ctx.embedder.dimensions, ctx.log) });
+    print({
+      collection: await ensureChunkCollection(ctx.qdrant, ctx.cfg.QDRANT_COLLECTION, ctx.embedder.dimensions, ctx.log),
+      judgmentCollection: await ensureJudgmentCollection(ctx.qdrant, ctx.cfg.QDRANT_JUDGMENT_COLLECTION, ctx.embedder.dimensions, ctx.log),
+    });
   } else if (values['drain-outbox']) {
-    print(await drainOutbox({ db: ctx.db, indexer: ctx.indexer, log: ctx.log }));
+    print(await drainOutbox({ db: ctx.db, indexer: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log }));
+  } else if (values['reindex-judgments']) {
+    print(
+      await reindexJudgments(
+        { db: ctx.db, client: ctx.qdrant, embedder: ctx.embedder, alias: ctx.cfg.QDRANT_JUDGMENT_COLLECTION, log: ctx.log },
+        { keepPrevious: values['keep-previous'] },
+      ),
+    );
   } else if (values['reindex-all']) {
     print(
       await reindexAll(

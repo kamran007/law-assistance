@@ -1,7 +1,7 @@
 import { Queue, Worker } from 'bullmq';
 import { z } from 'zod';
 import { createWorkerContext } from './context';
-import { ensureChunkCollection } from './index/collection';
+import { ensureChunkCollection, ensureJudgmentCollection } from './index/collection';
 import { drainOutbox } from './index/outbox';
 import { ANALYSIS_QUEUE, SCAN_QUEUE } from '@lawassist/providers';
 import { processAnalysisJob } from './analysis/job';
@@ -45,6 +45,7 @@ async function main() {
   const connection = { url: ctx.cfg.REDIS_URL, maxRetriesPerRequest: null };
 
   await ensureChunkCollection(ctx.qdrant, ctx.cfg.QDRANT_COLLECTION, ctx.embedder.dimensions, ctx.log);
+  await ensureJudgmentCollection(ctx.qdrant, ctx.cfg.QDRANT_JUDGMENT_COLLECTION, ctx.embedder.dimensions, ctx.log);
 
   const scrapeQueue = new Queue(SCRAPE_QUEUE, { connection });
   await scrapeQueue.upsertJobScheduler(
@@ -95,7 +96,7 @@ async function main() {
     // A full crawl of ~1,480 Acts at 1 req/s takes hours; keep the lock alive meanwhile.
     { connection, concurrency: 1, lockDuration: 10 * 60_000 },
   );
-  const outboxWorker = new Worker(OUTBOX_QUEUE, async () => drainOutbox({ db: ctx.db, indexer: ctx.indexer, log: ctx.log }), {
+  const outboxWorker = new Worker(OUTBOX_QUEUE, async () => drainOutbox({ db: ctx.db, indexer: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log }), {
     connection,
     concurrency: 1,
     lockDuration: 5 * 60_000,

@@ -16,6 +16,16 @@ export {
   type SearchFilter,
   type TemporalFilter,
 } from './chunk-index';
+export {
+  QdrantJudgmentIndex,
+  createJudgmentCollection,
+  buildJudgmentFilter,
+  type JudgmentChunkIndex,
+  type JudgmentChunkPayload,
+  type JudgmentChunkPoint,
+  type JudgmentChunkHit,
+  type JudgmentSearchFilter,
+} from './judgment-index';
 export type { QdrantClient } from '@qdrant/js-client-rest';
 export { STATUTE_CACHE_PREFIX, statuteGenerationKey } from './cache-keys';
 export { notConfiguredOcr, OcrNotConfiguredError, type OcrPageResult, type OcrProvider } from './ocr';

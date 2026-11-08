@@ -37,6 +37,8 @@ export const envSchema = z.object({
   EMBEDDING_MODEL: z.string().min(1).default('BAAI/bge-m3'),
   /** Qdrant ALIAS used for search; physical collections are <alias>_<timestamp> (TRD §4.4). */
   QDRANT_COLLECTION: z.string().regex(/^[a-z0-9_]+$/).default('section_chunks'),
+  /** Alias of the case-law collection (JUD-06). */
+  QDRANT_JUDGMENT_COLLECTION: z.string().regex(/^[a-z0-9_]+$/).default('judgment_chunks'),
   TEI_RERANK_URL: z.string().url().default('http://localhost:8082'),
 
   S3_ENDPOINT: z.preprocess(emptyToUndefined, z.string().url().optional()),
