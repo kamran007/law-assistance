@@ -4,7 +4,8 @@ import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysq
 import { sql } from 'drizzle-orm';
 import mysql from 'mysql2/promise';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { GRANTS_FILE, createDb, newId, runMigrations, scoped, users, type Db } from '@lawassist/db';
+import { GRANTS_FILE, createDb, judgmentStatuteRefs, judgments, newId, runMigrations, scoped, users, type Db } from '@lawassist/db';
+import { eq } from 'drizzle-orm';
 import type { ChunkIndex, ChunkPoint, EmbeddingProvider } from '@lawassist/providers';
 import { SectionIndexer } from '../src/index/indexer';
 import { drainOutbox } from '../src/index/outbox';
@@ -194,6 +195,38 @@ describe('device_tokens (push): API registers, worker reads and prunes', () => {
     expect(await worker.remove('tok-A')).toBe(true);
     await expectDenied(worker.register('tok-B', 'IOS'));
     await expectDenied(conns.app_scraper.db.execute(sql`SELECT * FROM device_tokens`));
+  });
+});
+
+describe('judgments (Module D): scraper writes, API and worker read', () => {
+  it('app_scraper writes judgments and refs; app_api reads them but cannot write; revisions stay with the scraper', async () => {
+    const judgmentId = newId();
+    await conns.app_scraper.db.insert(judgments).values({
+      judgmentId,
+      issueNumber: 20,
+      issueYear: 2025,
+      division: 'AD',
+      serialNumber: 1,
+      citation: '20 SCOB [2025] AD',
+      parties: 'A Vs. B',
+      keyWords: 'Penal Code, 1860; Section 409',
+      keyRatioParagraphs: ['93'],
+      sourcePdfUrl: 'https://www.supremecourt.gov.bd/resources/bulletin/20/1.pdf',
+      normalizedSectionKeys: [],
+    });
+    await conns.app_scraper.db.insert(judgmentStatuteRefs).values({ referenceId: newId(), judgmentId, normalizedSectionKey: '409', rawReferenceText: 'Section 409', paragraphNumbers: [], foundIn: 'KEY_WORDS' });
+    const [row] = await conns.app_api.db.select().from(judgments).where(eq(judgments.judgmentId, judgmentId));
+    expect(row).toMatchObject({ citation: '20 SCOB [2025] AD', extractionStatus: 'NEEDS_REVIEW' });
+    await expectDenied(conns.app_api.db.execute(sql`UPDATE judgments SET parties = 'x'`));
+    await expectDenied(conns.app_api.db.execute(sql`SELECT * FROM judgment_revisions`));
+    await expectDenied(conns.app_worker.db.execute(sql`UPDATE judgments SET parties = 'x'`));
+    // The natural key from the listing is unique.
+    await expect(
+      conns.app_scraper.db.insert(judgments).values({ judgmentId: newId(), issueNumber: 20, issueYear: 2025, division: 'AD', serialNumber: 1, citation: 'x', parties: 'x', keyWords: '', keyRatioParagraphs: [], sourcePdfUrl: 'x', normalizedSectionKeys: [] }),
+    ).rejects.toThrow();
+    // Keyword arm: the ngram FULLTEXT index answers.
+    const [hits] = (await conns.app_api.db.execute(sql`SELECT COUNT(*) AS n FROM judgments WHERE MATCH(parties, key_words, summary) AGAINST ('Penal' IN BOOLEAN MODE)`)) as unknown as [{ n: number }[]];
+    expect(Number(hits[0]!.n)).toBe(1);
   });
 });
 

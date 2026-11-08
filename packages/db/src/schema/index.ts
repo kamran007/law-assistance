@@ -8,3 +8,4 @@ export * from './users';
 export * from './statutes';
 export * from './cases';
 export * from './ops';
+export * from './judgments';

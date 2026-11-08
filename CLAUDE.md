@@ -48,7 +48,8 @@ apps/api          Fastify API
 apps/web          Next.js 15 web app (App Router, next-intl bn/en, Tailwind v4)
 apps/worker       BullMQ worker: scraper (src/scrape, see README there), vector indexing (src/index),
                   scan pipeline (src/scan; needs qpdf + Poppler, see apps/worker/Dockerfile),
-                  analysis stages 3–5 (src/analysis: LLM FIR extraction, dates, sections, Schedule II)
+                  analysis stages 3–5 (src/analysis: LLM FIR extraction, dates, sections, Schedule II),
+                  SCOB case-law harvester (src/scob, see README there)
 packages/config   Zod env loader
 packages/contracts  Generated OpenAPI spec + types, typed API client, SSE reader (do not edit schema.ts / openapi.json)
 packages/providers  TEI embedding client, Qdrant chunk index, LLM client (src/llm.ts), queue names,

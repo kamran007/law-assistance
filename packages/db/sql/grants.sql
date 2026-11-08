@@ -28,6 +28,10 @@ GRANT SELECT ON lawassist.statute_sections       TO 'app_api'@'%';
 GRANT SELECT ON lawassist.section_chunks         TO 'app_api'@'%';
 GRANT SELECT ON lawassist.scrape_runs            TO 'app_api'@'%';
 GRANT SELECT ON lawassist.scrape_events          TO 'app_api'@'%';
+-- Case law (Module D): public reference data, read-only for the API.
+GRANT SELECT ON lawassist.judgments              TO 'app_api'@'%';
+GRANT SELECT ON lawassist.judgment_statute_refs  TO 'app_api'@'%';
+GRANT SELECT ON lawassist.judgment_chunks        TO 'app_api'@'%';
 -- Schedule II is edited only through the admin console (API), with every change audited.
 GRANT SELECT, INSERT, UPDATE ON lawassist.crpc_schedule_metadata TO 'app_api'@'%';
 GRANT SELECT, INSERT ON lawassist.audit_log      TO 'app_api'@'%';   -- append-only
@@ -44,6 +48,10 @@ GRANT SELECT, INSERT ON lawassist.messages       TO 'app_worker'@'%';
 GRANT SELECT ON lawassist.statutes               TO 'app_worker'@'%';
 GRANT SELECT ON lawassist.statute_sections       TO 'app_worker'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.section_chunks TO 'app_worker'@'%';
+-- Case-law indexing (outbox → judgment_chunks → Qdrant) reads judgments, maintains chunks.
+GRANT SELECT ON lawassist.judgments              TO 'app_worker'@'%';
+GRANT SELECT ON lawassist.judgment_statute_refs  TO 'app_worker'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.judgment_chunks TO 'app_worker'@'%';
 GRANT SELECT ON lawassist.crpc_schedule_metadata TO 'app_worker'@'%';
 GRANT SELECT, UPDATE ON lawassist.outbox_events  TO 'app_worker'@'%';
 GRANT SELECT, INSERT ON lawassist.audit_log      TO 'app_worker'@'%';   -- append-only
@@ -55,3 +63,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.section_chunks TO 'app_scraper
 GRANT SELECT, INSERT, UPDATE ON lawassist.scrape_runs      TO 'app_scraper'@'%';
 GRANT SELECT, INSERT         ON lawassist.scrape_events    TO 'app_scraper'@'%';
 GRANT SELECT, INSERT         ON lawassist.outbox_events    TO 'app_scraper'@'%';
+-- SCOB harvester (TRD §4.3, §6A): writes case law; never user tables.
+GRANT SELECT, INSERT, UPDATE         ON lawassist.judgments             TO 'app_scraper'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.judgment_statute_refs TO 'app_scraper'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lawassist.judgment_chunks       TO 'app_scraper'@'%';
+GRANT SELECT, INSERT                 ON lawassist.judgment_revisions    TO 'app_scraper'@'%';
