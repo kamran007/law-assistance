@@ -7,6 +7,7 @@ import { AuthService } from './modules/auth/service';
 import { TokenService } from './modules/auth/tokens';
 import { noCache } from './modules/statutes/cache';
 import { StatutesRepository } from './modules/statutes/repository';
+import { JudgmentsRepository } from './modules/judgments/repository';
 
 /**
  * The OpenAPI document of the full API, built from the real route schemas with inert dependencies
@@ -20,6 +21,7 @@ export async function buildOpenApiSpec(): Promise<Record<string, unknown>> {
   const unused = () => Promise.reject(new Error('spec build only'));
   const app = await buildApp(loadConfig({ NODE_ENV: 'test', DATABASE_URL: 'mysql://spec:spec@127.0.0.1:1/spec' }), {
     statutes: { repo: new StatutesRepository(db), cache: noCache, authenticate, today: () => '2026-01-01' },
+    judgments: { repo: new JudgmentsRepository(db), storage: { presignGet: unused } },
     auth: { service: new AuthService({ db, tokens, sender: { send: unused }, otpKey: 'k'.repeat(32) }), authenticate, secureCookies: true },
     cases: { db, authenticate, today: () => '2026-01-01' },
     devices: { db, authenticate },

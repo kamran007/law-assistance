@@ -22,6 +22,7 @@ import { deviceRoutes, type DeviceRoutesDeps } from './modules/devices/routes';
 import { documentRoutes, type DocumentRoutesDeps } from './modules/documents/routes';
 import { draftRoutes, type DraftRoutesDeps } from './modules/drafts/routes';
 import { statuteRoutes, type StatuteRoutesDeps } from './modules/statutes/routes';
+import { judgmentRoutes, type JudgmentRoutesDeps } from './modules/judgments/routes';
 import { ApiError, problem } from './problem';
 
 export { problem, type Problem } from './problem';
@@ -31,6 +32,8 @@ export interface AppDeps {
   checkReady?: () => Promise<boolean>;
   /** Statute read API (BE-06). Omitted in tests of the bare skeleton. */
   statutes?: StatuteRoutesDeps;
+  /** Case-law read API (JUD-07). */
+  judgments?: JudgmentRoutesDeps;
   /** OTP login, sessions and /me (BE-03/BE-04). */
   auth?: AuthRoutesDeps;
   /** Case files (BE-15). */
@@ -183,6 +186,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
   );
 
   if (deps.statutes) await app.register(statuteRoutes(deps.statutes), { prefix: API_PREFIX });
+  if (deps.judgments) await app.register(judgmentRoutes(deps.judgments), { prefix: API_PREFIX });
   if (deps.auth) await app.register(authRoutes(deps.auth), { prefix: API_PREFIX });
   if (deps.cases) await app.register(caseRoutes(deps.cases), { prefix: API_PREFIX });
   if (deps.conversations) await app.register(conversationRoutes(deps.conversations), { prefix: API_PREFIX });

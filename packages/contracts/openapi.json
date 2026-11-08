@@ -791,6 +791,652 @@
         }
       }
     },
+    "/api/v1/judgments": {
+      "get": {
+        "summary": "Search case law (Supreme Court Online Bulletin)",
+        "tags": [
+          "judgments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "q",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AD",
+                "HCD"
+              ]
+            },
+            "in": "query",
+            "name": "division",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1950,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "year",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000000
+            },
+            "in": "query",
+            "name": "act_id",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "in": "query",
+            "name": "sec",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            },
+            "in": "query",
+            "name": "judge",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "judgment_id": {
+                            "type": "string"
+                          },
+                          "citation": {
+                            "type": "string"
+                          },
+                          "parties": {
+                            "type": "string"
+                          },
+                          "division": {
+                            "type": "string",
+                            "enum": [
+                              "AD",
+                              "HCD"
+                            ]
+                          },
+                          "issue": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "issue_year": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "serial": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "case_number": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "authoring_judge": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "decision_date": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "key_words": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "enum": [
+                              "EN",
+                              "BN",
+                              "MIXED"
+                            ]
+                          },
+                          "text_available": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "judgment_id",
+                          "citation",
+                          "parties",
+                          "division",
+                          "issue",
+                          "issue_year",
+                          "serial",
+                          "case_number",
+                          "authoring_judge",
+                          "decision_date",
+                          "key_words",
+                          "language",
+                          "text_available"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "limit",
+                    "offset",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/judgments/{judgment_id}": {
+      "get": {
+        "summary": "A judgment: metadata, text by paragraph, linked sections, original PDF",
+        "tags": [
+          "judgments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "judgment_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "judgment_id": {
+                      "type": "string"
+                    },
+                    "citation": {
+                      "type": "string"
+                    },
+                    "parties": {
+                      "type": "string"
+                    },
+                    "division": {
+                      "type": "string",
+                      "enum": [
+                        "AD",
+                        "HCD"
+                      ]
+                    },
+                    "issue": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "issue_year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "serial": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "case_number": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "authoring_judge": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "decision_date": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
+                    "key_words": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "enum": [
+                        "EN",
+                        "BN",
+                        "MIXED"
+                      ]
+                    },
+                    "text_available": {
+                      "type": "boolean"
+                    },
+                    "bench": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "summary": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "key_ratio_paragraphs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "decision_date_source": {
+                      "nullable": true,
+                      "type": "string",
+                      "enum": [
+                        "PDF_RULE",
+                        "PDF_LLM",
+                        "MANUAL"
+                      ]
+                    },
+                    "extraction_status": {
+                      "type": "string",
+                      "enum": [
+                        "OK",
+                        "OCR_USED",
+                        "NEEDS_REVIEW"
+                      ]
+                    },
+                    "preamble": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "paragraphs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "n": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "n",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "linked_sections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "act_id": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "act_title": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "sec": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "raw": {
+                            "type": "string"
+                          },
+                          "paragraphs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "found_in": {
+                            "type": "string",
+                            "enum": [
+                              "KEY_WORDS",
+                              "BODY"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "act_id",
+                          "act_title",
+                          "sec",
+                          "raw",
+                          "paragraphs",
+                          "found_in"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pdf_url": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "source_pdf_url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "judgment_id",
+                    "citation",
+                    "parties",
+                    "division",
+                    "issue",
+                    "issue_year",
+                    "serial",
+                    "case_number",
+                    "authoring_judge",
+                    "decision_date",
+                    "key_words",
+                    "language",
+                    "text_available",
+                    "bench",
+                    "summary",
+                    "key_ratio_paragraphs",
+                    "decision_date_source",
+                    "extraction_status",
+                    "preamble",
+                    "paragraphs",
+                    "linked_sections",
+                    "pdf_url",
+                    "source_pdf_url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/statutes/{act_id}/sections/{sec}/judgments": {
+      "get": {
+        "summary": "Judgments that discuss this section (Appellate Division first, newest first)",
+        "tags": [
+          "judgments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000000
+            },
+            "in": "path",
+            "name": "act_id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "in": "path",
+            "name": "sec",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "act_id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "sec": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "judgment_id": {
+                            "type": "string"
+                          },
+                          "citation": {
+                            "type": "string"
+                          },
+                          "parties": {
+                            "type": "string"
+                          },
+                          "division": {
+                            "type": "string",
+                            "enum": [
+                              "AD",
+                              "HCD"
+                            ]
+                          },
+                          "issue": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "issue_year": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "serial": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "case_number": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "authoring_judge": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "decision_date": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "key_words": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "enum": [
+                              "EN",
+                              "BN",
+                              "MIXED"
+                            ]
+                          },
+                          "text_available": {
+                            "type": "boolean"
+                          },
+                          "paragraphs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "older_than_current_version": {
+                            "nullable": true,
+                            "type": "boolean"
+                          },
+                          "section_amended_on": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          }
+                        },
+                        "required": [
+                          "judgment_id",
+                          "citation",
+                          "parties",
+                          "division",
+                          "issue",
+                          "issue_year",
+                          "serial",
+                          "case_number",
+                          "authoring_judge",
+                          "decision_date",
+                          "key_words",
+                          "language",
+                          "text_available",
+                          "paragraphs",
+                          "older_than_current_version",
+                          "section_amended_on"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "act_id",
+                    "sec",
+                    "total",
+                    "limit",
+                    "offset",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/otp/request": {
       "post": {
         "summary": "Send a one-time code by SMS or email",

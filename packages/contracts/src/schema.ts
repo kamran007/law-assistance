@@ -291,6 +291,221 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/judgments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search case law (Supreme Court Online Bulletin) */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    division?: "AD" | "HCD";
+                    year?: number;
+                    act_id?: number;
+                    sec?: string;
+                    judge?: string;
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            total: number;
+                            limit: number;
+                            offset: number;
+                            items: {
+                                judgment_id: string;
+                                citation: string;
+                                parties: string;
+                                /** @enum {string} */
+                                division: "AD" | "HCD";
+                                issue: number;
+                                issue_year: number;
+                                serial: number;
+                                case_number: string | null;
+                                authoring_judge: string | null;
+                                /** Format: date */
+                                decision_date: string | null;
+                                key_words: string;
+                                /** @enum {string} */
+                                language: "EN" | "BN" | "MIXED";
+                                text_available: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/judgments/{judgment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A judgment: metadata, text by paragraph, linked sections, original PDF */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    judgment_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            judgment_id: string;
+                            citation: string;
+                            parties: string;
+                            /** @enum {string} */
+                            division: "AD" | "HCD";
+                            issue: number;
+                            issue_year: number;
+                            serial: number;
+                            case_number: string | null;
+                            authoring_judge: string | null;
+                            /** Format: date */
+                            decision_date: string | null;
+                            key_words: string;
+                            /** @enum {string} */
+                            language: "EN" | "BN" | "MIXED";
+                            text_available: boolean;
+                            bench: string[];
+                            summary: string | null;
+                            key_ratio_paragraphs: string[];
+                            /** @enum {string|null} */
+                            decision_date_source: "PDF_RULE" | "PDF_LLM" | "MANUAL" | null;
+                            /** @enum {string} */
+                            extraction_status: "OK" | "OCR_USED" | "NEEDS_REVIEW";
+                            preamble: string | null;
+                            paragraphs: {
+                                n: number;
+                                text: string;
+                            }[];
+                            linked_sections: {
+                                act_id: number | null;
+                                act_title: string | null;
+                                sec: string | null;
+                                raw: string;
+                                paragraphs: string[];
+                                /** @enum {string} */
+                                found_in: "KEY_WORDS" | "BODY";
+                            }[];
+                            pdf_url: string | null;
+                            source_pdf_url: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/statutes/{act_id}/sections/{sec}/judgments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Judgments that discuss this section (Appellate Division first, newest first) */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    act_id: number;
+                    sec: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            act_id: number;
+                            sec: string;
+                            total: number;
+                            limit: number;
+                            offset: number;
+                            items: {
+                                judgment_id: string;
+                                citation: string;
+                                parties: string;
+                                /** @enum {string} */
+                                division: "AD" | "HCD";
+                                issue: number;
+                                issue_year: number;
+                                serial: number;
+                                case_number: string | null;
+                                authoring_judge: string | null;
+                                /** Format: date */
+                                decision_date: string | null;
+                                key_words: string;
+                                /** @enum {string} */
+                                language: "EN" | "BN" | "MIXED";
+                                text_available: boolean;
+                                paragraphs: string[];
+                                older_than_current_version: boolean | null;
+                                /** Format: date */
+                                section_amended_on: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/otp/request": {
         parameters: {
             query?: never;

@@ -14,6 +14,7 @@ import { BullAnalysisQueue, BullScanQueue } from './modules/documents/queue';
 import { S3DocumentStorage } from './modules/documents/storage';
 import { RedisSectionCache, resilient } from './modules/statutes/cache';
 import { StatutesRepository } from './modules/statutes/repository';
+import { JudgmentsRepository } from './modules/judgments/repository';
 import { dhakaToday } from './time';
 
 const config = loadConfig();
@@ -45,6 +46,7 @@ const otpSender =
     ? new ChannelOtpSender({ EMAIL: SmtpOtpSender.fromUrl(config.SMTP_URL!, config.OTP_EMAIL_FROM!), ...(dev ? { SMS: new ConsoleOtpSender() } : {}) })
     : new ConsoleOtpSender();
 
+const documentStorage = S3DocumentStorage.fromConfig(config);
 const app = await buildApp(config, {
   checkReady: async () => {
     await db.execute(sql`SELECT 1`);
@@ -57,6 +59,7 @@ const app = await buildApp(config, {
     authenticate,
     today: dhakaToday,
   },
+  judgments: { repo: new JudgmentsRepository(db), storage: documentStorage },
   auth: {
     // OTP_DELIVERY=console is the only sender until PRE-05; config refuses it outside development.
     service: new AuthService({ db, tokens, sender: otpSender, otpKey }),
@@ -70,7 +73,7 @@ const app = await buildApp(config, {
   documents: {
     db,
     authenticate,
-    storage: S3DocumentStorage.fromConfig(config),
+    storage: documentStorage,
     queue: scanQueue,
     analysis: analysisQueue,
     events: eventHub,

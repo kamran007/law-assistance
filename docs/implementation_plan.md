@@ -193,7 +193,7 @@ These items block engineering milestones. Start them in **Week 1**.
 - [ ] **WEB-09** Push-to-talk mic in chat: hold to record, slide to cancel, editable transcript, auto-send (App Flow §6)
 
 ### Case Law — search & citations
-- [ ] **JUD-07** Judgments API (`/judgments`, `/judgments/{id}`, `/statutes/{act}/sections/{sec}/judgments` with the `older_than_current_version` flag) + case-law arm in retrieval + `JUDGMENT` sources in prompts + validator `kind` and the `JUDGMENT_ONLY_CITATION` / `UNSOURCED_CASE_REFERENCE` flags (TRD §5.1, §6A.5, §7.1–7.4) · *Depends:* JUD-06, BE-07, BE-11, BE-13 · *Done when:* validator unit tests cover judgment refs and the case-law arm stays within the §11.1 budget
+- [~] **JUD-07** Judgments API (`/judgments`, `/judgments/{id}`, `/statutes/{act}/sections/{sec}/judgments` with the `older_than_current_version` flag) + case-law arm in retrieval + `JUDGMENT` sources in prompts + validator `kind` and the `JUDGMENT_ONLY_CITATION` / `UNSOURCED_CASE_REFERENCE` flags (TRD §5.1, §6A.5, §7.1–7.4) · *Depends:* JUD-06, BE-07, BE-11, BE-13 · *Done when:* validator unit tests cover judgment refs and the case-law arm stays within the §11.1 budget
 - [ ] **WEB-12** Case Law in the Law Library (search, filters, Judgment Viewer with paragraph anchors and original-PDF link), judgment chips in chat, "Judgments on this section" block in the verifier (App Flow §5, §7.1, §7.3)
 
 ### Mobile (start)
