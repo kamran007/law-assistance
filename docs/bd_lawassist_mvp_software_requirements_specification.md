@@ -227,6 +227,8 @@ The Supreme Court of Bangladesh publishes selected reported judgments in the **S
 | Division list (older issues, 1–14) | `?page=bulletin/bulletin_list.php&menu=00&div_id={1\|2}&issue={issue}` | Generic list template. |
 | Individual judgment PDF | `../resources/bulletin/{issue}/{serial}. {issue} SCOB {AD\|HCD}-{serial}.pdf` (URL-encoded) | One PDF per reported judgment. |
 
+> **As found (JUD-01, 2026-11-08):** judgment PDF names vary by issue (`20/1. 20 SCOB AD-1.pdf`, `20/01. 20 SCOB HCD.pdf`, `5_SCOB_AD_1.pdf`, `14_SCOB_HD_1.pdf`), so the crawler takes each href from the list row instead of building it. Issue 1 lists case numbers instead of parties and citation. 456 judgments in issues 1–20. Details: `apps/worker/src/scob/README.md`.
+
 Each division list is a single page (no pagination) with one row per judgment, showing: **serial number, parties (Petitioner/Appellant Vs. Respondent), authoring judge, citation (e.g. `20 SCOB [2025] AD`), key words (statutes, sections and legal topics), a short summary, and the key-ratio paragraph number(s)**. The list does **not** show the decision date or case number; these must be taken from the judgment PDF.
 
 ```text

@@ -3,3 +3,5 @@
 *.png binary
 *.jpg binary
 *.gz binary
+# SCOB fixtures are byte-exact server responses (mixed UTF-8 / Windows-1252): no line-ending conversion.
+apps/worker/test/fixtures/scob/*.html -text
