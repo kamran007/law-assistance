@@ -105,7 +105,7 @@ function looksLikeAddress(text: string, g: { start: number; end: number }): bool
   return ADDRESS_WORDS.test(around);
 }
 
-interface ActMention {
+export interface ActMention {
   act: ActEntry;
   start: number;
   end: number;
@@ -126,6 +126,9 @@ function findActs(text: string): ActMention[] {
   for (const m of all) if (!kept.some((k) => m.start < k.end && k.start < m.end)) kept.push(m);
   return kept.sort((a, b) => a.start - b.start);
 }
+
+/** Every dictionary Act named in NFC text, in order, overlaps resolved longest-first. */
+export const findActMentions = (nfcText: string): ActMention[] => findActs(nfcText);
 
 /** The Act a free-text name refers to ("দণ্ডবিধি", "Cr.P.C.", "Narcotics Control Act"), if any. */
 export function resolveActName(name: string | null | undefined): DetectedAct | null {

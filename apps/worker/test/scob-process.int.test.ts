@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
-import { createDb, judgmentRevisions, judgments, outboxEvents, runMigrations, type Db } from '@lawassist/db';
+import { createDb, judgmentRevisions, judgments, judgmentStatuteRefs, newId, outboxEvents, runMigrations, statutes, statuteSections, type Db } from '@lawassist/db';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ScobJudgmentJob } from '../src/scob/crawl';
 import { judgmentPdfKey, processScobJudgment, type ScobProcessDeps } from '../src/scob/process';
 import { scobJudgmentJobSchema } from '../src/scob/queue';
+import { relinkJudgments } from '../src/scob/statute-links';
 
 /**
  * JUD-04 against MySQL 8.4 (Testcontainers). Download and PDF tools are fakes: the text comes from a
@@ -14,6 +15,22 @@ import { scobJudgmentJobSchema } from '../src/scob/queue';
 let container: StartedMySqlContainer;
 let db: Db;
 let close: () => Promise<void>;
+const BTRC = newId();
+const addSection = (key: string) =>
+  db.insert(statuteSections).values({
+    sectionId: newId(),
+    statuteId: BTRC,
+    sectionNumber: key,
+    normalizedSectionKey: key,
+    contentBody: 'test text',
+    amendmentFootnotes: [],
+    contentHash: 'a'.repeat(64),
+    footnotesHash: 'b'.repeat(64),
+    versionNumber: 1,
+    isCurrent: true,
+    validFrom: '2001-04-30',
+    validFromSource: 'ENACTMENT_DATE',
+  });
 
 beforeAll(async () => {
   container = await new MySqlContainer('mysql:8.4')
@@ -24,6 +41,9 @@ beforeAll(async () => {
   const url = `mysql://root:root@${container.getHost()}:${container.getPort()}/lawassist`;
   await runMigrations(url);
   ({ db, close } = createDb(url, { connectionLimit: 3 }));
+  // JUD-05: the BTRC Act is in the corpus with sections 63 and 65 (section 40 not yet).
+  await db.insert(statutes).values({ statuteId: BTRC, bdlawsActId: 857, titleEn: 'The Bangladesh Telecommunication Regulation Act, 2001', language: 'EN', sourceUrl: 'http://bdlaws.minlaw.gov.bd/act-857.html' });
+  for (const key of ['63', '65']) await addSection(key);
 }, 180_000);
 afterAll(async () => {
   await close?.();
@@ -81,7 +101,7 @@ describe('processScobJudgment', () => {
     const h = harness();
     const out = await processScobJudgment(h.deps, job());
     // The saved header is the real pages 1–4: paragraphs 1–23 of the judgment are already there.
-    expect(out).toMatchObject({ status: 'STORED', extraction: 'OK', changed: true, paragraphs: 23 });
+    expect(out).toMatchObject({ status: 'STORED', extraction: 'OK', changed: true, paragraphs: 23, statuteLinks: 2 });
     const j = await byNaturalKey(1);
     expect(j).toMatchObject({
       citation: '14 SCOB [2020] HCD',
@@ -102,6 +122,13 @@ describe('processScobJudgment', () => {
     expect(h.stored.has(j.storedPdfKey!)).toBe(true);
     const events = await db.select().from(outboxEvents).where(eq(outboxEvents.aggregateId, j.judgmentId));
     expect(events.map((e) => e.eventType)).toEqual(['JUDGMENT_UPSERTED']);
+
+    // JUD-05: key words and body link to sections that exist; section 40 (not in the corpus) stays unlinked.
+    expect(j.normalizedSectionKeys).toEqual([BTRC + ':63', BTRC + ':65']);
+    const refs = await db.select().from(judgmentStatuteRefs).where(eq(judgmentStatuteRefs.judgmentId, j.judgmentId));
+    expect(refs).toContainEqual(expect.objectContaining({ statuteId: BTRC, normalizedSectionKey: '63', foundIn: 'KEY_WORDS', paragraphNumbers: [] }));
+    expect(refs).toContainEqual(expect.objectContaining({ statuteId: BTRC, normalizedSectionKey: '65', foundIn: 'BODY', rawReferenceText: 'under section 65(5) of the Bangladesh Telecommunication Regulation Act 2001' }));
+    expect(refs).toContainEqual(expect.objectContaining({ statuteId: null, normalizedSectionKey: '40', foundIn: 'BODY', paragraphNumbers: ['8'] }));
   });
 
   it('the same PDF again is UNCHANGED (no tools, no new event); a changed PDF keeps the old text as a revision', async () => {
@@ -145,5 +172,22 @@ describe('processScobJudgment', () => {
   it('job payloads from Redis are validated (SCOB PDFs only)', () => {
     expect(scobJudgmentJobSchema.safeParse(job()).success).toBe(true);
     expect(scobJudgmentJobSchema.safeParse(job({ pdfUrl: 'https://evil.test/x.pdf' })).success).toBe(false);
+  });
+
+  it('relink: a section scraped later gets linked, the keys update and the index is told once', async () => {
+    const j = await byNaturalKey(1);
+    const eventsBefore = (await db.select().from(outboxEvents).where(eq(outboxEvents.aggregateId, j.judgmentId))).length;
+    const refCount = async () => (await db.select().from(judgmentStatuteRefs).where(eq(judgmentStatuteRefs.judgmentId, j.judgmentId))).length;
+    const refsBefore = await refCount();
+    const log = { info: () => undefined, warn: () => undefined, error: () => undefined };
+
+    await addSection('40');
+    expect(await relinkJudgments(db, log, { judgmentIds: [j.judgmentId] })).toEqual({ judgments: 1, changed: 1, links: 3 });
+    expect((await byNaturalKey(1)).normalizedSectionKeys).toEqual([BTRC + ':40', BTRC + ':63', BTRC + ':65']);
+    expect(await refCount()).toBe(refsBefore); // replaced, not duplicated
+
+    // Nothing new: no event.
+    expect(await relinkJudgments(db, log, { judgmentIds: [j.judgmentId] })).toMatchObject({ changed: 0 });
+    expect((await db.select().from(outboxEvents).where(eq(outboxEvents.aggregateId, j.judgmentId))).length).toBe(eventsBefore + 1);
   });
 });

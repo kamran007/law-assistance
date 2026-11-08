@@ -10,6 +10,7 @@ import type { PoliteHttpClient } from '../scrape/http-client';
 import type { Log } from '../scrape/run-scrape';
 import type { ScobJudgmentJob } from './crawl';
 import { parseJudgmentHeader } from './pdf-metadata';
+import { findStatuteRefs, replaceStatuteRefs, sectionKeysOf, StatuteLinker } from './statute-links';
 import { averageCharsPerPage, cleanPages, detectLanguage, markParagraphs, MIN_CHARS_PER_PAGE } from './text';
 
 /** TRD §6A.3 step 1. */
@@ -25,10 +26,12 @@ export interface ScobProcessDeps {
   /** Object storage for the original PDFs (public data, not tenant files). */
   objects: { put(key: string, bytes: Uint8Array, contentType: string): Promise<void> };
   log: Log;
+  /** Reused across judgments in one worker (caches the statute titles); a fresh one per call otherwise. */
+  linker?: StatuteLinker;
 }
 
 export type ScobProcessOutcome =
-  | { status: 'STORED'; judgmentId: string; extraction: 'OK' | 'NEEDS_REVIEW'; changed: boolean; paragraphs: number }
+  | { status: 'STORED'; judgmentId: string; extraction: 'OK' | 'NEEDS_REVIEW'; changed: boolean; paragraphs: number; statuteLinks: number }
   | { status: 'UNCHANGED'; judgmentId: string };
 
 /** `raw/scob/{issue}/{division}/{serial}/{pdf_sha256}.pdf` (TRD §4.2). */
@@ -39,8 +42,9 @@ const isPdf = (b: Uint8Array) => b.length > 4 && b[0] === 0x25 && b[1] === 0x50 
 /**
  * One SCOB judgment (TRD §6A.3; JUD-04): fetch → hash (unchanged → stop) → qpdf → text (Bijoy
  * converted; too little text → NEEDS_REVIEW until OCR exists) → `[para n]` markers → header
- * metadata (rules) → store the PDF → one transaction: upsert, old text to `judgment_revisions`
- * when the PDF changed, outbox `JUDGMENT_UPSERTED`. Statute links come with JUD-05. A file that
+ * metadata (rules) → statute links (JUD-05) → store the PDF → one transaction: upsert, old text to
+ * `judgment_revisions` when the PDF changed, replace `judgment_statute_refs`, outbox
+ * `JUDGMENT_UPSERTED`. A file that
  * isn't a usable PDF is stored as NEEDS_REVIEW so it shows in the admin queue instead of retrying.
  */
 export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgmentJob): Promise<ScobProcessOutcome> {
@@ -80,6 +84,7 @@ export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgme
   const enoughText = usable && averageCharsPerPage(pages) >= MIN_CHARS_PER_PAGE;
   const header = parseJudgmentHeader(pages.slice(0, HEADER_PAGES).join('\n'));
   const { text: fullText, paragraphs } = markParagraphs(cleanPages(pages));
+  const links = await (deps.linker ?? new StatuteLinker(deps.db)).resolve(findStatuteRefs(row.keyWords, fullText || null));
 
   const storedPdfKey = isPdf(file.bytes) ? judgmentPdfKey(row, sha256) : null;
   if (storedPdfKey) await deps.objects.put(storedPdfKey, file.bytes, 'application/pdf');
@@ -105,6 +110,7 @@ export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgme
     storedPdfKey,
     pdfSha256: sha256,
     listingHtmlS3Key: job.listingSnapshotKey,
+    normalizedSectionKeys: sectionKeysOf(links),
     extractionStatus: enoughText ? ('OK' as const) : ('NEEDS_REVIEW' as const),
     lastSyncedAt: new Date(),
   };
@@ -115,17 +121,19 @@ export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgme
       if (current.pdfSha256 && current.pdfSha256 !== sha256) {
         await tx.insert(judgmentRevisions).values({ revisionId: newId(), judgmentId: current.judgmentId, pdfSha256: current.pdfSha256, storedPdfKey: current.storedPdfKey, fullText: current.fullText });
       }
-      // Statute links (JUD-05) keep their own column; don't wipe them here.
       await tx.update(judgments).set(values).where(eq(judgments.judgmentId, current.judgmentId));
+      await replaceStatuteRefs(tx, current.judgmentId, links);
       await tx.insert(outboxEvents).values({ aggregate: 'judgment', aggregateId: current.judgmentId, eventType: 'JUDGMENT_UPSERTED', payload: { changed: current.pdfSha256 !== sha256 } });
       return current.judgmentId;
     }
     const id = newId();
-    await tx.insert(judgments).values({ judgmentId: id, source: 'SCOB', issueNumber: row.issue, division: row.division, serialNumber: row.serial, normalizedSectionKeys: [], ...values });
+    await tx.insert(judgments).values({ judgmentId: id, source: 'SCOB', issueNumber: row.issue, division: row.division, serialNumber: row.serial, ...values });
+    await replaceStatuteRefs(tx, id, links);
     await tx.insert(outboxEvents).values({ aggregate: 'judgment', aggregateId: id, eventType: 'JUDGMENT_UPSERTED', payload: { changed: true } });
     return id;
   });
 
-  deps.log.info({ judgmentId, issue: row.issue, division: row.division, serial: row.serial, pages: pages.length, paragraphs, bijoy, extraction: values.extractionStatus }, 'scob judgment stored');
-  return { status: 'STORED', judgmentId, extraction: values.extractionStatus, changed: !existing || existing.pdfSha256 !== sha256, paragraphs };
+  const statuteLinks = values.normalizedSectionKeys.length;
+  deps.log.info({ judgmentId, issue: row.issue, division: row.division, serial: row.serial, pages: pages.length, paragraphs, bijoy, statuteLinks, extraction: values.extractionStatus }, 'scob judgment stored');
+  return { status: 'STORED', judgmentId, extraction: values.extractionStatus, changed: !existing || existing.pdfSha256 !== sha256, paragraphs, statuteLinks };
 }

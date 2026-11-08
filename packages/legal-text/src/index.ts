@@ -17,4 +17,4 @@ export {
   type SectionSource,
 } from './section-merge';
 export { ACT_DICTIONARY, DEFAULT_FIR_ACT, type ActEntry } from './act-dictionary';
-export { detectSections, uniqueCitations, resolveActName, type SectionCitation, type DetectedAct, type DetectOptions } from './section-detector';
+export { detectSections, uniqueCitations, resolveActName, findActMentions, type ActMention, type SectionCitation, type DetectedAct, type DetectOptions } from './section-detector';

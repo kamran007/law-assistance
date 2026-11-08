@@ -65,3 +65,18 @@ dates. **Use `pdftotext -layout` for the header** (pages 1–4): plain mode spli
 `Date of Judgment : 15-01-2025`, `: 30.04.2013.`, `Judgment on: 25.8.2019` (right column), hearing
 dates continued over several lines. Paragraphs are numbered `1.`, `2.` … at line start, which fits
 paragraph-aware chunking (JUD-06).
+
+## Statute links (JUD-05)
+
+`statute-links.ts` runs the DATA-12 section detector over the key words and the `[para n]` body and
+picks each citation's Act **by adjacency**: an Act written right after ("Section 5(2) of the Prevention of
+Corruption Act, 1947") wins, else one right before ("Evidence Act, 1872 ↵ Section 57", "দণ্ডবিধির ৩০২"),
+else none. Key-word lists name several Acts in a row, so the FIR rule (nearest Act) would attach
+"Section 5 … of the Prevention of Corruption Act" to the Penal Code named just before it.
+
+Dictionary Acts resolve by bdlaws id; other English names are matched against `statutes.title_en`. A
+link gets `statute_id` only when the section exists in `statute_sections`; everything else is kept with
+`statute_id = NULL` and the text as written. After more Acts are scraped, run
+`pnpm --filter @lawassist/worker scrape -- --scob-relink` (no downloads; an outbox event only for
+judgments whose links changed). Not covered yet: Constitution articles, Act names written only in Bangla
+transliteration.
