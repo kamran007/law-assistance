@@ -380,7 +380,10 @@
       "OTHER": "সংশোধিত"
     },
     "verbatimNote": "প্রকাশিত মূল পাঠ, অপরিবর্তিত। আইনি পরামর্শ নয়।",
-    "retry": "আবার চেষ্টা করুন"
+    "retry": "আবার চেষ্টা করুন",
+    "sort": "সাজান",
+    "sortNewest": "সর্বশেষ আগে",
+    "sortRelevance": "সবচেয়ে মিল আগে"
   },
   "verifier": {
     "title": "আইন যাচাই",
@@ -513,6 +516,9 @@
     "paras": "অনুচ্ছেদ {paras}",
     "olderThanCurrent": "এই ধারা {date} তারিখে সংশোধনের আগে রায়টি দেওয়া হয়েছে।",
     "olderThanCurrentNoDate": "এই ধারার বর্তমান পাঠের আগে রায়টি দেওয়া হয়েছে।",
-    "seeAll": "সব {count, number}টি রায় দেখুন"
+    "seeAll": "সব {count, number}টি রায় দেখুন",
+    "sort": "সাজান",
+    "sortNewest": "সর্বশেষ আগে",
+    "sortRelevance": "সবচেয়ে মিল আগে"
   }
 }

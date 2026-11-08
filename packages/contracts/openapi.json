@@ -49,6 +49,19 @@
           },
           {
             "schema": {
+              "default": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "relevance"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false
+          },
+          {
+            "schema": {
               "default": 20,
               "type": "integer",
               "minimum": 1,
@@ -859,6 +872,19 @@
             },
             "in": "query",
             "name": "judge",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "relevance"
+              ]
+            },
+            "in": "query",
+            "name": "sort",
             "required": false
           },
           {

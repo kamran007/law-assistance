@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, isNotNull, isNull, lte, gt, or, sql, type SQL } from 'drizzle-orm';
 import { crpcScheduleMetadata, statutes, statuteSections, type Db } from '@lawassist/db';
+import { requiredWords, type Sort } from '../../fulltext';
 import { compareSectionKeys } from './section-order';
 
 /**
@@ -14,6 +15,7 @@ export interface StatuteSearch {
   q?: string | undefined;
   status?: 'ACTIVE' | 'REPEALED' | undefined;
   year?: number | undefined;
+  sort?: Sort | undefined;
   limit: number;
   offset: number;
 }
@@ -29,8 +31,9 @@ export class StatutesRepository {
     const where: SQL[] = [];
     if (p.status) where.push(eq(statutes.status, p.status));
     if (p.year) where.push(sql`YEAR(${statutes.enactedDate}) = ${p.year}`);
-    // ngram FULLTEXT on both titles (migration 0001), so Bangla and English queries both work.
-    const match = p.q ? sql`MATCH(${statutes.titleEn}, ${statutes.titleBn}) AGAINST (${p.q} IN NATURAL LANGUAGE MODE)` : null;
+    // ngram FULLTEXT on both titles (migrations 0001, 0005), Bangla and English; every word required.
+    const words = p.q ? requiredWords(p.q) : '';
+    const match = words ? sql`MATCH(${statutes.titleEn}, ${statutes.titleBn}) AGAINST (${words} IN BOOLEAN MODE)` : null;
     if (match) where.push(sql`${match} > 0`);
     const cond = where.length ? and(...where) : undefined;
 
@@ -39,8 +42,8 @@ export class StatutesRepository {
       .select()
       .from(statutes)
       .where(cond)
-      // Newest first (unknown dates last); a title search keeps the best match on top.
-      .orderBy(...(match ? [desc(match)] : []), sql`${statutes.enactedDate} IS NULL`, desc(statutes.enactedDate), desc(statutes.bdlawsActId))
+      // Newest first (unknown dates last), or best match first when asked.
+      .orderBy(...(match && p.sort === 'relevance' ? [desc(match)] : []), sql`${statutes.enactedDate} IS NULL`, desc(statutes.enactedDate), desc(statutes.bdlawsActId))
       .limit(p.limit)
       .offset(p.offset);
     return { total: Number(totalRow?.n ?? 0), items };

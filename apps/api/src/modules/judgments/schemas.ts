@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SORTS } from '../../fulltext';
 import { actIdParam } from '../statutes/schemas';
 
 /** Zod contracts for the case-law read API (TRD §5.1, §6A.5; JUD-07). snake_case like the rest. */
@@ -19,6 +20,8 @@ export const judgmentListQuery = z.object({
   sec: z.string().min(1).max(32).optional(),
   /** Authoring judge or bench member, part of the name. */
   judge: z.string().trim().min(2).max(100).optional(),
+  /** Newest decision first (default), or best match first. */
+  sort: z.enum(SORTS).default('newest'),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });

@@ -17,6 +17,7 @@ export type paths = {
                     q?: string;
                     status?: "ACTIVE" | "REPEALED";
                     year?: number;
+                    sort?: "newest" | "relevance";
                     limit?: number;
                     offset?: number;
                 };
@@ -308,6 +309,7 @@ export type paths = {
                     act_id?: number;
                     sec?: string;
                     judge?: string;
+                    sort?: "newest" | "relevance";
                     limit?: number;
                     offset?: number;
                 };

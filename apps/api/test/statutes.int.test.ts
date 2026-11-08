@@ -107,6 +107,14 @@ describe('GET /statutes', () => {
     expect(bn.items[0]).toMatchObject({ title: 'নারী ও শিশু নির্যাতন দমন আইন, ২০০০', language: 'BN', title_en: null });
   });
 
+  it('a search requires every word and lists the matches newest first, or best match first on request', async () => {
+    const ids = async (q: string) => (await get(`/statutes?${q}`)).json().items.map((s: { act_id: number }) => s.act_id);
+    expect(await ids('q=penal code')).toEqual([11]); // both words required: no loose ngram matches
+    expect(await ids('q=the')).toEqual([16, 11]); // Gambling Act 1867 before Penal Code 1860
+    expect(await ids('q=the&sort=relevance')).toHaveLength(2);
+    expect((await get('/statutes?sort=oldest')).statusCode).toBe(422);
+  });
+
   it('filters by status and year, and pages through the list', async () => {
     expect((await get('/statutes?status=REPEALED')).json().items.map((s: { act_id: number }) => s.act_id)).toEqual([16]);
     expect((await get('/statutes?year=1860')).json().items.map((s: { act_id: number }) => s.act_id)).toEqual([11]);

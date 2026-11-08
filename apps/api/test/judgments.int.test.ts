@@ -113,6 +113,9 @@ describe('GET /judgments', () => {
     const pick = async (q: string) => (await get(`/judgments?${q}`)).json().items.map((i: { judgment_id: string }) => i.judgment_id);
     expect(await pick('q=dying declaration')).toContain(ids.ad);
     expect(await pick('q=Karim')).toEqual([ids.hcd]);
+    expect(await pick('q=State')).toEqual([ids.hcd, ids.ad]); // newest first among matches
+    expect(await pick('q=State Rahim')).toEqual([ids.ad]); // every word required
+    expect(await pick('q=State&sort=relevance')).toHaveLength(2);
     expect(await pick('division=HCD')).toEqual([ids.hcd]);
     expect(await pick('year=2019')).toEqual([ids.ad]);
     expect(await pick('year=2025')).toEqual([ids.hcd, ids.scanned]); // no decision date → bulletin year

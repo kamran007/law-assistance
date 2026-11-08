@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { judgments, judgmentStatuteRefs, statutes, statuteSections, type Db } from '@lawassist/db';
+import { requiredWords, type Sort } from '../../fulltext';
 
 /**
  * Read-only queries for the public case-law API (TRD §5.1; JUD-07). Judgments are public reference
@@ -16,6 +17,7 @@ export interface JudgmentSearch {
   statuteId?: string | undefined;
   sectionKey?: string | undefined;
   judge?: string | undefined;
+  sort?: Sort | undefined;
   limit: number;
   offset: number;
 }
@@ -68,7 +70,7 @@ export class JudgmentsRepository {
     // ngram FULLTEXT (migration 0003), Bangla and English. BOOLEAN mode: each word is a phrase of
     // its ngrams, so a name matches wherever it occurs (natural-language mode drops ngrams that
     // occur in half the rows). The user's text is reduced to plain words first.
-    const words = p.q ? booleanWords(p.q) : '';
+    const words = p.q ? requiredWords(p.q) : '';
     const match = words ? sql`MATCH(${judgments.parties}, ${judgments.keyWords}, ${judgments.summary}) AGAINST (${words} IN BOOLEAN MODE)` : null;
     if (match) where.push(sql`${match} > 0`);
     const cond = where.length ? and(...where) : undefined;
@@ -78,8 +80,8 @@ export class JudgmentsRepository {
       .select()
       .from(judgments)
       .where(cond)
-      // A word search keeps the best match on top; otherwise newest first.
-      .orderBy(...(match ? [desc(match)] : []), ...newestFirst)
+      // Newest first, or best match first when asked.
+      .orderBy(...(match && p.sort === 'relevance' ? [desc(match)] : []), ...newestFirst)
       .limit(p.limit)
       .offset(p.offset);
     return { total: Number(totalRow?.n ?? 0), items };
@@ -143,16 +145,6 @@ export class JudgmentsRepository {
       }),
     };
   }
-}
-
-/** Free text → space-separated words without BOOLEAN-mode operators ("+-<>()~*\"@"). Max 20 words. */
-export function booleanWords(q: string): string {
-  return q
-    .replace(/[+\-<>()~*"@]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length >= 2)
-    .slice(0, 20)
-    .join(' ');
 }
 
 /** A UUID as the BINARY(16) the columns store, for raw SQL fragments. */

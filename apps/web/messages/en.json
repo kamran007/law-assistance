@@ -380,7 +380,10 @@
       "OTHER": "Amended"
     },
     "verbatimNote": "Published text, unchanged. Not legal advice.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "sort": "Sort",
+    "sortNewest": "Newest first",
+    "sortRelevance": "Best match"
   },
   "verifier": {
     "title": "Law Verifier",
@@ -513,6 +516,9 @@
     "paras": "paras {paras}",
     "olderThanCurrent": "Decided before this section was amended on {date}.",
     "olderThanCurrentNoDate": "Decided before the current wording of this section.",
-    "seeAll": "See all {count, number} judgments"
+    "seeAll": "See all {count, number} judgments",
+    "sort": "Sort",
+    "sortNewest": "Newest first",
+    "sortRelevance": "Best match"
   }
 }

@@ -6,7 +6,7 @@ import { dataOrNull, judgmentLang, LIBRARY_REVALIDATE_S, serverApi, type Judgmen
 
 const PAGE_SIZE = 20;
 
-type Search = { q?: string; division?: string; year?: string; judge?: string; act_id?: string; sec?: string; page?: string };
+type Search = { q?: string; division?: string; year?: string; judge?: string; act_id?: string; sec?: string; sort?: string; page?: string };
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -27,13 +27,14 @@ export default async function JudgmentsPage({ params, searchParams }: { params: 
   const judge = sp.judge?.trim().slice(0, 100) || undefined;
   const actId = sp.act_id && /^\d{1,9}$/.test(sp.act_id) ? Number(sp.act_id) : undefined;
   const sec = actId && sp.sec ? sp.sec.slice(0, 32) : undefined;
+  const sort = sp.sort === 'relevance' ? 'relevance' : undefined; // newest first by default
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
 
   let list: JudgmentList | null | 'error';
   try {
     list = await dataOrNull(
       serverApi(LIBRARY_REVALIDATE_S).GET('/api/v1/judgments', {
-        params: { query: { q: q && q.length >= 2 ? q : undefined, division, year, judge: judge && judge.length >= 2 ? judge : undefined, act_id: actId, sec, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE } },
+        params: { query: { q: q && q.length >= 2 ? q : undefined, division, year, judge: judge && judge.length >= 2 ? judge : undefined, act_id: actId, sec, sort, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE } },
       }),
     );
   } catch {
@@ -47,6 +48,7 @@ export default async function JudgmentsPage({ params, searchParams }: { params: 
     ...(judge ? { judge } : {}),
     ...(actId ? { act_id: String(actId) } : {}),
     ...(sec ? { sec } : {}),
+    ...(sort ? { sort } : {}),
     ...(p > 1 ? { page: String(p) } : {}),
   });
   const pages = list && list !== 'error' ? Math.ceil(list.total / PAGE_SIZE) : 0;
@@ -80,6 +82,13 @@ export default async function JudgmentsPage({ params, searchParams }: { params: 
         <label className="space-y-1">
           <span className="block text-sm font-medium">{t('judge')}</span>
           <input name="judge" defaultValue={judge ?? ''} maxLength={100} className={`w-40 ${input}`} />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-sm font-medium">{t('sort')}</span>
+          <select name="sort" defaultValue={sort ?? ''} className={input}>
+            <option value="">{t('sortNewest')}</option>
+            <option value="relevance">{t('sortRelevance')}</option>
+          </select>
         </label>
         {actId && <input type="hidden" name="act_id" value={actId} />}
         {sec && <input type="hidden" name="sec" value={sec} />}

@@ -6,7 +6,7 @@ import { actTitle, dataOrNull, LIBRARY_REVALIDATE_S, serverApi } from '@/lib/ser
 
 const PAGE_SIZE = 20;
 
-type Search = { q?: string; status?: string; year?: string; page?: string };
+type Search = { q?: string; status?: string; year?: string; sort?: string; page?: string };
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -24,11 +24,13 @@ export default async function LibraryPage({ params, searchParams }: { params: Pr
   const q = sp.q?.trim().slice(0, 200) || undefined;
   const status = sp.status === 'ACTIVE' || sp.status === 'REPEALED' ? sp.status : undefined;
   const year = sp.year && /^\d{4}$/.test(sp.year) ? Number(sp.year) : undefined;
+  // Newest first unless the reader picks best match (only meaningful with search words).
+  const sort = sp.sort === 'relevance' ? 'relevance' : undefined;
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
 
   let list: Awaited<ReturnType<typeof load>> | 'error';
   async function load() {
-    return dataOrNull(serverApi(LIBRARY_REVALIDATE_S).GET('/api/v1/statutes', { params: { query: { q, status, year, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE } } }));
+    return dataOrNull(serverApi(LIBRARY_REVALIDATE_S).GET('/api/v1/statutes', { params: { query: { q, status, year, sort, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE } } }));
   }
   try {
     list = await load();
@@ -36,7 +38,7 @@ export default async function LibraryPage({ params, searchParams }: { params: Pr
     list = 'error';
   }
 
-  const query = (p: number) => ({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(year ? { year: String(year) } : {}), ...(p > 1 ? { page: String(p) } : {}) });
+  const query = (p: number) => ({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(year ? { year: String(year) } : {}), ...(sort ? { sort } : {}), ...(p > 1 ? { page: String(p) } : {}) });
   const pages = list && list !== 'error' ? Math.ceil(list.total / PAGE_SIZE) : 0;
 
   return (
@@ -64,6 +66,13 @@ export default async function LibraryPage({ params, searchParams }: { params: Pr
         <label className="space-y-1">
           <span className="block text-sm font-medium">{t('year')}</span>
           <input name="year" inputMode="numeric" pattern="[0-9]{4}" defaultValue={year ?? ''} className="w-24 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-sm font-medium">{t('sort')}</span>
+          <select name="sort" defaultValue={sort ?? ''} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+            <option value="">{t('sortNewest')}</option>
+            <option value="relevance">{t('sortRelevance')}</option>
+          </select>
         </label>
         <button type="submit" className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white">
           {t('search')}

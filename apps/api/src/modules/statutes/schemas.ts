@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SORTS } from '../../fulltext';
 
 /**
  * Zod contracts for the statute read API (TRD §5.1). JSON uses snake_case like the rest of the API.
@@ -13,6 +14,8 @@ export const statuteListQuery = z.object({
   q: z.string().trim().min(2).max(200).optional(),
   status: z.enum(['ACTIVE', 'REPEALED']).optional(),
   year: z.coerce.number().int().min(1700).max(2100).optional(),
+  /** Newest enactment first (default), or best title match first. */
+  sort: z.enum(SORTS).default('newest'),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
