@@ -80,7 +80,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit + web) | ✅ 1043 passed + 7 skipped (31 files; 5 need qpdf/Poppler and run in CI and the worker image, where 7/7 pass; 2 are the opt-in live LLM tests, passed with `RUN_LIVE_LLM=1`) |
+| `pnpm test` (unit + web) | ✅ 1042 passed + 7 skipped (31 files; 5 need qpdf/Poppler and run in CI and the worker image, where 7/7 pass; 2 are the opt-in live LLM tests, passed with `RUN_LIVE_LLM=1`) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
