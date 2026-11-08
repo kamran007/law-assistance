@@ -30,6 +30,7 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 - `pnpm db:generate` (after schema changes) · `pnpm db:migrate`
 - `pnpm openapi` after changing API route schemas (regenerates `packages/contracts`; a test fails on drift)
 - `pnpm dev:web` (Next.js on :3001) · `pnpm --filter @lawassist/web build`
+- `pnpm --filter @lawassist/api s3:cors` once after `docker compose up` (lets the browser upload to the local bucket)
 
 ## Rules that must not be broken
 - **Tenant isolation:** tenant tables (case_files, case_artifacts, artifact_revisions, conversations, messages) are only accessed via `scoped(db, userId)` from `@lawassist/db`. Never import `@lawassist/db/schema` in apps (ESLint blocks it). Another user's resource → 404.

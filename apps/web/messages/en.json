@@ -161,7 +161,7 @@
     "documents": {
       "loading": "Loading documents…",
       "loadFailed": "Couldn't load the documents.",
-      "empty": "No documents in this case yet. Scanning and upload are coming next.",
+      "empty": "No documents in this case yet. Upload an FIR or another document.",
       "status": {
         "UPLOADED": "Uploaded",
         "OCR": "Reading text",
@@ -179,7 +179,19 @@
         "COURT_ORDER_NOTE": "Court order note",
         "VOICE_DICTATION_DRAFT": "Dictation draft",
         "GD_DRAFT": "GD draft"
-      }
+      },
+      "upload": "Scan / Upload",
+      "dropHint": "You can also drop a file here to upload it.",
+      "progressLabel": "Processing steps",
+      "steps": {
+        "UPLOADED": "Uploaded",
+        "OCR": "Reading text",
+        "EXTRACTING": "Extracting",
+        "SCHEDULE_LOOKUP": "Schedule II",
+        "ANALYZING": "Analysis"
+      },
+      "failed": "Couldn't read this document.",
+      "uploadAgain": "Upload again"
     },
     "drafts": {
       "empty": "Drafts (dictated or typed) are coming soon."
@@ -188,6 +200,30 @@
       "loading": "Loading the conversation…",
       "loadFailed": "Couldn't load the conversation.",
       "ready": "This case's own conversation is ready, kept apart from other cases and general chats. Chat is coming soon."
+    },
+    "upload": {
+      "title": "Upload a document",
+      "dropHere": "Drop a file here, or choose one",
+      "accepted": "PDF, DOCX, JPG or PNG; up to {mb} MB",
+      "choose": "Choose file",
+      "chooseOther": "Choose another file",
+      "typeLabel": "Document type",
+      "upload": "Upload",
+      "uploading": "Uploading",
+      "uploadingPercent": "Uploading… {percent}%",
+      "cancel": "Cancel",
+      "errors": {
+        "UNSUPPORTED_TYPE": "Unsupported file. Use PDF, DOCX, JPG or PNG.",
+        "TOO_LARGE": "File too large (max {mb} MB).",
+        "EMPTY_FILE": "The file is empty.",
+        "UPLOAD_FAILED": "The file couldn't be sent. Check your connection and try again.",
+        "UPLOAD_TYPE_MISMATCH": "The file's content doesn't match its type.",
+        "UPLOAD_CONTENT_INVALID": "The file is unreadable or damaged.",
+        "UPLOAD_NOT_FOUND": "The upload didn't finish. Please try again.",
+        "RATE_LIMITED": "Too many uploads. Try again in a little while.",
+        "NETWORK": "Can't reach the server.",
+        "generic": "Couldn't upload. Please try again in a moment."
+      }
     }
   }
 }

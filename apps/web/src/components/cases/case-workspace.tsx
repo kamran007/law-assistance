@@ -1,7 +1,9 @@
 'use client';
 
 import { useFormatter, useTranslations } from 'next-intl';
-import { useState, type KeyboardEvent } from 'react';
+import { useState, type DragEvent, type KeyboardEvent } from 'react';
+import { DocumentCard } from '@/components/documents/document-card';
+import { UploadDialog } from '@/components/documents/upload-dialog';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import type { Me } from '@/lib/auth/store';
 import { isProfessional, isStatus, useArtifacts, useCase, useCaseConversation, useDeleteCase, useUpdateCase, type Artifact, type CaseFile } from '@/lib/cases';
@@ -176,35 +178,53 @@ function Overview({ c }: { c: CaseFile }) {
   );
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  READY: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
-  FAILED: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200',
-};
-
 function Documents({ id }: { id: string }) {
   const t = useTranslations('cases.documents');
-  const format = useFormatter();
   const { data, isPending, isError } = useArtifacts(id);
-  if (isPending) return <p role="status" className="text-[var(--muted)]">{t('loading')}</p>;
-  if (isError) return <p role="alert" className="text-red-700">{t('loadFailed')}</p>;
-  if (data.length === 0) return <Placeholder text={t('empty')} />;
+  const [dialog, setDialog] = useState<{ file: File | null } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) setDialog({ file });
+  };
+
   return (
-    <ul className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)]">
-      {data.map((a: Artifact) => {
-        const status = a.processing_status ?? 'UPLOADED';
-        return (
-          <li key={a.artifact_id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <p className="font-medium">{t.has(`types.${a.artifact_type}`) ? t(`types.${a.artifact_type}`) : a.artifact_type}</p>
-              <p className="text-xs text-[var(--muted)]">{format.dateTime(new Date(a.created_at), { dateStyle: 'medium', timeStyle: 'short' })}</p>
-            </div>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLE[status] ?? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'}`}>
-              {t(`status.${status}`)}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      className={`space-y-4 rounded-xl ${dragging ? 'outline-2 outline-dashed outline-brand-600' : ''}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-[var(--muted)]">{t('dropHint')}</p>
+        <button type="button" onClick={() => setDialog({ file: null })} className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white">
+          {t('upload')}
+        </button>
+      </div>
+      {isPending ? (
+        <p role="status" className="text-[var(--muted)]">
+          {t('loading')}
+        </p>
+      ) : isError ? (
+        <p role="alert" className="text-red-700">
+          {t('loadFailed')}
+        </p>
+      ) : data.length === 0 ? (
+        <Placeholder text={t('empty')} />
+      ) : (
+        <ul className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-[var(--card)]">
+          {data.map((a: Artifact) => (
+            <DocumentCard key={a.artifact_id} caseId={id} artifact={a} onUploadAgain={() => setDialog({ file: null })} />
+          ))}
+        </ul>
+      )}
+      {dialog && <UploadDialog caseId={id} initialFile={dialog.file} onClose={() => setDialog(null)} />}
+    </div>
   );
 }
 

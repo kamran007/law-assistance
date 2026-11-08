@@ -131,7 +131,8 @@ describe('CaseWorkspace', () => {
 
   it('documents tab lists types and processing status', async () => {
     renderIn(<CaseWorkspace id={ID} user={me('CITIZEN')} tab="documents" />);
-    const items = await screen.findAllByRole('listitem');
+    // Document cards only (each card's progress stepper is a nested list).
+    const items = (await screen.findAllByRole('listitem')).filter((li) => li.parentElement?.tagName === 'UL');
     expect(items.map((li) => li.textContent)).toEqual([expect.stringContaining('FIR'), expect.stringContaining('Charge sheet')]);
     expect(items[0]!.textContent).toContain(en.cases.documents.status.READY);
     expect(items[1]!.textContent).toContain(en.cases.documents.status.ANALYZING);
