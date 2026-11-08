@@ -483,6 +483,7 @@ Case files and artifacts are visible only to `owner_user_id`. The app offers no 
 ```
 
 > **Gap:** The SRS defines no endpoint for checking scan status. Proposed: `GET /api/v1/cases/{id}/artifacts/{art_id}` for polling, or a server push event.
+> **As built (BE-26):** both. `GET …/artifacts/{art_id}` returns status plus `structured_analysis` / `role_analysis`; `GET …/artifacts/{art_id}/events` streams status changes (SSE, `event: status`, ids and status only) and ends at READY / FAILED. Browsers' `EventSource` cannot send the bearer token, so the web app reads the stream with `fetch`. Stage 5 results appear at ANALYZING, before the role analysis finishes.
 
 ### 9.4 Scan Result screen
 

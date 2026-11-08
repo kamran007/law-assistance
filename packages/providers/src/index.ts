@@ -19,7 +19,7 @@ export {
 export type { QdrantClient } from '@qdrant/js-client-rest';
 export { STATUTE_CACHE_PREFIX, statuteGenerationKey } from './cache-keys';
 export { notConfiguredOcr, OcrNotConfiguredError, type OcrPageResult, type OcrProvider } from './ocr';
-export { SCAN_QUEUE, SCAN_JOB, ANALYSIS_QUEUE, ANALYSIS_JOB, type DocumentJob } from './queues';
+export { SCAN_QUEUE, SCAN_JOB, ANALYSIS_QUEUE, ANALYSIS_JOB, type DocumentJob, type AnalysisJob } from './queues';
 export {
   createLlmClient,
   CircuitBreaker,
@@ -34,3 +34,20 @@ export {
   type StructuredRequest,
   type StructuredResult,
 } from './llm';
+export {
+  ARTIFACT_EVENTS_PREFIX,
+  artifactEventsChannel,
+  TERMINAL_STATUSES,
+  noopArtifactEvents,
+  RedisArtifactEventPublisher,
+  RedisArtifactEventHub,
+  MemoryArtifactEvents,
+  noopPushNotifier,
+  type ArtifactEvent,
+  type ArtifactStatus,
+  type ArtifactEventPublisher,
+  type ArtifactEventHub,
+  type ArtifactEventListener,
+  type PushNotifier,
+} from './artifact-events';
+export { FirCorrectionsSchema, REANALYSIS_FIELDS, FIR_FIELDS, type FirCorrections, type StoredCorrections } from './fir-corrections';

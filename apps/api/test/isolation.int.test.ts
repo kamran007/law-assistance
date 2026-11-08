@@ -55,6 +55,9 @@ const attacks: Record<string, Attack> = {
   'GET /api/v1/cases/:id/artifacts': { url: () => `/cases/${ids.bCase}/artifacts` },
   'GET /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}` },
   'DELETE /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}` },
+  'PATCH /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}`, payload: { police_station: 'pwned' }, headers: { 'if-match': '"1"' } },
+  'POST /api/v1/cases/:id/artifacts/:art_id/reanalyze': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}/reanalyze` },
+  'GET /api/v1/cases/:id/artifacts/:art_id/events': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}/events` },
 };
 
 /** Tenant routes without an id: they act on the caller's own data; checked for leaks below. */

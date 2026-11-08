@@ -14,7 +14,7 @@ export interface LlmCitedSection {
   raw: string;
 }
 
-export type SectionSource = 'DETECTOR' | 'DETECTOR_AND_LLM' | 'LLM_QUOTE_IN_TEXT';
+export type SectionSource = 'DETECTOR' | 'DETECTOR_AND_LLM' | 'LLM_QUOTE_IN_TEXT' | 'USER_CORRECTED';
 
 export interface MergedSection {
   /** Normalized section key: "302", "561A", "11". */
@@ -92,4 +92,30 @@ function fromDetector(c: SectionCitation): MergedSection {
     citedTogether: c.citedTogether,
     source: 'DETECTOR',
   };
+}
+
+/**
+ * Sections the user corrected (TRD §8.5; BE-26). They replace the detector's reading: the user
+ * fixes exactly what OCR or the detector got wrong ("৩২৮" misread for "৩২৩"). "11(গ)" keeps its
+ * clause as the sub-section; an unnamed Act gets the FIR default, flagged as inferred.
+ */
+export function userCitedSections(list: { act_hint: string | null; section: string }[], opts: { defaultAct?: 'PENAL_CODE' | null } = {}): MergeResult {
+  const sections: MergedSection[] = [];
+  const rejected: RejectedSection[] = [];
+  const fallback = opts.defaultAct === 'PENAL_CODE' ? resolveActName('Penal Code') : null;
+  for (const item of list) {
+    const raw = item.section.normalize('NFC').trim();
+    const m = /^([^(]+?)\s*((?:\([^)]{1,8}\)\s*){0,3})$/u.exec(raw);
+    const key = m ? normalizeSectionKey(m[1]!.trim()) : null;
+    if (!m || !key) {
+      rejected.push({ section: item.section, actHint: item.act_hint, reason: 'UNREADABLE_SECTION' });
+      continue;
+    }
+    const hint = resolveActName(item.act_hint);
+    const act = hint ?? fallback;
+    const subsection = m[2] ? toAsciiDigits(m[2]).replace(/\s+/g, '') : null;
+    if (sections.some((s) => s.key === key && s.subsection === subsection && s.act?.key === act?.key)) continue;
+    sections.push({ key, section: m[1]!.trim(), subsection, act, actInferred: !hint && !!act, citedTogether: [], source: 'USER_CORRECTED' });
+  }
+  return { sections, rejected };
 }

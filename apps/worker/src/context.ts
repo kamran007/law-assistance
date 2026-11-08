@@ -2,7 +2,16 @@ import { Redis } from 'ioredis';
 import { pino } from 'pino';
 import { loadConfig } from '@lawassist/config';
 import { createDb } from '@lawassist/db';
-import { QdrantChunkIndex, TeiEmbeddingProvider, createLlmClient, createQdrantClient, notConfiguredOcr, statuteGenerationKey } from '@lawassist/providers';
+import {
+  QdrantChunkIndex,
+  RedisArtifactEventPublisher,
+  TeiEmbeddingProvider,
+  createLlmClient,
+  createQdrantClient,
+  noopPushNotifier,
+  notConfiguredOcr,
+  statuteGenerationKey,
+} from '@lawassist/providers';
 import { S3DocumentObjects } from './scan/objects';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
@@ -43,6 +52,11 @@ export function createWorkerContext() {
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
 
   // Scan pipeline (TRD §8.2): user data, so it runs on the app_worker connection through scoped().
+  // Status events for the API's SSE relay (TRD §8.1 step 4). Push via FCM arrives with the
+  // mobile app (Firebase credentials + device tokens); until then the hook is a no-op.
+  const events = new RedisArtifactEventPublisher(redis);
+  const push = noopPushNotifier;
+
   const scan = {
     db,
     tools: new CliDocumentTools(),
@@ -50,6 +64,8 @@ export function createWorkerContext() {
     ocr: notConfiguredOcr,
     objects: S3DocumentObjects.fromConfig(cfg),
     log,
+    events,
+    push,
   };
 
   // Stage 3 FIR extraction (TRD §7.6): key and relay URL from env only. Without a key, analysis
@@ -67,6 +83,8 @@ export function createWorkerContext() {
     scrape,
     scan,
     llm,
+    events,
+    push,
     qdrant,
     embedder,
     indexer,

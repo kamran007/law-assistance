@@ -1,9 +1,19 @@
-import { newId, scoped, type CaseArtifact, type Db } from '@lawassist/db';
+import { auditLog, newId, scoped, type CaseArtifact, type Db } from '@lawassist/db';
+import {
+  FirCorrectionsSchema,
+  TERMINAL_STATUSES,
+  type ArtifactEvent,
+  type ArtifactEventHub,
+  type ArtifactEventPublisher,
+  type ArtifactStatus,
+} from '@lawassist/providers';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { requireAuth, type Authenticate } from '../../auth';
+import { requireIfMatch, setVersionEtag } from '../../http';
 import { ApiError } from '../../problem';
-import type { ScanQueue } from './queue';
+import { applyCorrections, isCorrectable } from './corrections';
+import type { AnalysisQueue, ScanQueue } from './queue';
 import type { DocumentStorage } from './storage';
 import {
   MAGIC_BYTES_TO_READ,
@@ -21,6 +31,14 @@ export interface DocumentRoutesDeps {
   authenticate: Authenticate;
   storage: DocumentStorage;
   queue: ScanQueue;
+  /** `/reanalyze` (TRD §8.5). Without it the route answers 503. */
+  analysis?: AnalysisQueue;
+  /** Status relay for `/events` (TRD §8.1 step 4). Without it the route answers 503. */
+  events?: ArtifactEventHub;
+  /** Publishes the status change `/reanalyze` makes. */
+  publisher?: ArtifactEventPublisher;
+  /** SSE timings, shortened in tests. */
+  sse?: { heartbeatMs?: number; maxStreamMs?: number };
 }
 
 const caseParam = z.object({ id: z.uuid() });
@@ -54,7 +72,27 @@ const toArtifact = (a: CaseArtifact): z.infer<typeof artifact> => ({
   updated_at: a.updatedAt.toISOString(),
 });
 
+/** Detail view: the list stays light; the scan result screen (App Flow §9.4) reads these. */
+const artifactDetail = artifact.extend({
+  structured_analysis: z.record(z.string(), z.unknown()).nullable(),
+  role_analysis: z.record(z.string(), z.unknown()).nullable(),
+});
+const asRecord = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+const toDetail = (a: CaseArtifact): z.infer<typeof artifactDetail> => ({
+  ...toArtifact(a),
+  structured_analysis: asRecord(a.structuredAnalysis),
+  role_analysis: asRecord(a.roleAnalysis),
+});
+
+const toEvent = (a: CaseArtifact): ArtifactEvent => ({
+  artifact_id: a.artifactId,
+  status: (a.processingStatus ?? 'UPLOADED') as ArtifactStatus,
+  error: a.processingStatus === 'FAILED' ? a.processingError : null,
+  at: a.updatedAt.toISOString(),
+});
+
 const notFound = () => new ApiError(404, 'NOT_FOUND', 'Not found');
+const busy = () => new ApiError(409, 'ARTIFACT_BUSY', 'The document is being processed', 'Wait until processing has finished (status READY)');
 
 /**
  * Document upload and registration (TRD §8.1, §12.6; BE-21) plus artifact reads. The file never
@@ -170,14 +208,148 @@ export const documentRoutes =
       '/cases/:id/artifacts/:art_id',
       {
         config: { access: 'tenant' },
-        schema: { tags: ['documents'], summary: 'A document’s processing status and details', params: artifactParams, response: { 200: artifact } },
+        schema: { tags: ['documents'], summary: 'A document’s processing status, extracted details and analysis', params: artifactParams, response: { 200: artifactDetail } },
       },
-      async (req) => {
+      async (req, reply) => {
         const { repo } = await auth(req);
         const a = await repo.artifacts.findById(req.params.art_id);
         // The artifact must belong to THIS case too, not just to this user.
         if (!a || a.caseFileId !== req.params.id) throw notFound();
-        return toArtifact(a);
+        setVersionEtag(reply, a.version);
+        return toDetail(a);
+      },
+    );
+
+    app.patch(
+      '/cases/:id/artifacts/:art_id',
+      {
+        config: { access: 'tenant', rateLimit: { max: 120, timeWindow: '1 hour' } },
+        schema: {
+          tags: ['documents'],
+          summary: 'Correct extracted FIR fields (needs If-Match). Dates and sections take effect after /reanalyze',
+          params: artifactParams,
+          body: FirCorrectionsSchema,
+          response: { 200: artifactDetail },
+        },
+      },
+      async (req, reply) => {
+        const { p, repo } = await auth(req);
+        const expected = requireIfMatch(req);
+        const a = await repo.artifacts.findById(req.params.art_id);
+        if (!a || a.caseFileId !== req.params.id) throw notFound();
+        if (a.processingStatus !== 'READY') throw busy();
+        if (!isCorrectable(a.structuredAnalysis)) {
+          throw new ApiError(409, 'NOT_CORRECTABLE', 'This document has no extracted FIR fields to correct');
+        }
+        const { analysis, changed } = applyCorrections(a.structuredAnalysis, req.body, new Date());
+        const res = await repo.artifacts.updateAnalysis(a.artifactId, expected, analysis);
+        if (res.status === 'not_found') throw notFound();
+        if (res.status === 'busy') throw busy();
+        if (res.status === 'version_conflict') {
+          setVersionEtag(reply, res.current.version);
+          throw new ApiError(412, 'VERSION_CONFLICT', 'The document was changed elsewhere', 'Reload it and apply your correction again');
+        }
+        // Who changed which fields; the values live in the artifact, not in the audit trail.
+        await deps.db.insert(auditLog).values({ actorUserId: p.userId, action: 'ARTIFACT_FIELDS_CORRECTED', entity: 'case_artifact', entityId: a.artifactId, details: { fields: changed } });
+        setVersionEtag(reply, res.row.version);
+        return toDetail(res.row);
+      },
+    );
+
+    app.post(
+      '/cases/:id/artifacts/:art_id/reanalyze',
+      {
+        config: { access: 'tenant', rateLimit: { max: 30, timeWindow: '1 hour' } },
+        schema: {
+          tags: ['documents'],
+          summary: 'Re-run dates, sections, Schedule II and the role analysis with the corrected fields',
+          params: artifactParams,
+          response: { 202: artifact },
+        },
+      },
+      async (req, reply) => {
+        const { p, repo } = await auth(req);
+        const a = await repo.artifacts.findById(req.params.art_id);
+        if (!a || a.caseFileId !== req.params.id) throw notFound(); // ownership before anything else
+        if (!deps.analysis) throw new ApiError(503, 'UNAVAILABLE', 'Reanalysis is not available');
+        if (!isCorrectable(a.structuredAnalysis)) throw new ApiError(409, 'NOT_CORRECTABLE', 'This document has no FIR analysis to re-run');
+        const started = await repo.artifacts.startReanalysis(a.artifactId);
+        if (!started) throw busy();
+        await deps.analysis.enqueueReanalysis({ artifactId: a.artifactId, ownerUserId: p.userId });
+        await deps.publisher?.publish(toEvent(started)).catch((err: unknown) => req.log.warn({ artifactId: a.artifactId, err: String(err) }, 'status event not published'));
+        req.log.info({ artifactId: a.artifactId }, 'reanalysis queued');
+        return reply.status(202).send(toArtifact(started));
+      },
+    );
+
+    app.get(
+      '/cases/:id/artifacts/:art_id/events',
+      {
+        config: { access: 'tenant' },
+        schema: {
+          tags: ['documents'],
+          summary: 'Live processing status (Server-Sent Events: `event: status`, data = {artifact_id, status, error, at}); ends at READY or FAILED',
+          params: artifactParams,
+        },
+      },
+      async (req, reply) => {
+        const { repo } = await auth(req);
+        const first = await repo.artifacts.findById(req.params.art_id);
+        if (!first || first.caseFileId !== req.params.id) throw notFound(); // ownership before anything else
+        if (!deps.events) throw new ApiError(503, 'UNAVAILABLE', 'Live status is not available', 'Poll GET …/artifacts/{id} instead');
+        const artifactId = first.artifactId;
+
+        // EventSource reconnects whenever a stream ends; 204 tells it to stop once processing has
+        // finished (it sends Last-Event-ID on reconnects).
+        if (req.headers['last-event-id'] && TERMINAL_STATUSES.includes(toEvent(first).status)) return reply.status(204).send();
+
+        const raw = reply.raw;
+        let closed = false;
+        let lastSent = '';
+        let seq = 0;
+        // Set once the stream is running; `finish` may run before any of them exists.
+        const handles: { heartbeat?: NodeJS.Timeout; maxTimer?: NodeJS.Timeout; unsubscribe?: () => Promise<void> } = {};
+
+        const finish = () => {
+          if (closed) return;
+          closed = true;
+          clearInterval(handles.heartbeat);
+          clearTimeout(handles.maxTimer);
+          void handles.unsubscribe?.().catch(() => undefined);
+          raw.end();
+        };
+        const send = (ev: ArtifactEvent) => {
+          if (closed) return;
+          const key = `${ev.status}|${ev.error ?? ''}`;
+          if (key === lastSent) return; // the initial read and an event can report the same change
+          lastSent = key;
+          raw.write(`id: ${++seq}\nevent: status\ndata: ${JSON.stringify(ev)}\n\n`);
+          if (TERMINAL_STATUSES.includes(ev.status)) finish();
+        };
+
+        reply.hijack();
+        raw.writeHead(200, {
+          ...(reply.getHeaders() as Record<string, string>),
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache, no-transform',
+          connection: 'keep-alive',
+          'x-accel-buffering': 'no',
+        });
+        req.raw.on('close', finish);
+
+        // Subscribe BEFORE reading the current state, so a change between the two is not lost.
+        const buffered: ArtifactEvent[] = [];
+        let live = false;
+        handles.unsubscribe = await deps.events.subscribe(artifactId, (ev) => (live ? send(ev) : buffered.push(ev)));
+        const current = await repo.artifacts.findById(artifactId);
+        if (!current) return finish(); // deleted meanwhile
+        send(toEvent(current));
+        live = true;
+        for (const ev of buffered) send(ev);
+
+        handles.heartbeat = setInterval(() => !closed && raw.write(': keep-alive\n\n'), deps.sse?.heartbeatMs ?? 15_000);
+        // Bounded streams; clients reconnect (and get 204 once processing has finished).
+        handles.maxTimer = setTimeout(finish, deps.sse?.maxStreamMs ?? 10 * 60_000);
       },
     );
 

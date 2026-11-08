@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { scoped, users, type CaseArtifact, type Db } from '@lawassist/db';
-import { LlmNotConfiguredError, LlmRefusalError, LlmTruncatedError, type LlmClient } from '@lawassist/providers';
+import type { LlmCitedSection } from '@lawassist/legal-text';
+import { LlmNotConfiguredError, LlmRefusalError, LlmTruncatedError, type AnalysisJob, type LlmClient, type StoredCorrections } from '@lawassist/providers';
 import { DocumentTooLongError, extractFir, type FirExtraction } from './extract';
 import { postProcessFir, type StructuredAnalysisV1 } from './post-process';
 import { generateRoleAnalysis, type AnalysisRole, type Lang, type ValidatedRoleAnalysis } from './roles';
 import { loadPinnedSources } from './sources';
+import { trackedRepo, type StatusEventDeps } from '../status-events';
 
 /**
  * Consumer of the `analysis` queue (TRD §8.2 stages 3–6; BE-23, BE-24, BE-25). Runs as the
@@ -17,7 +19,7 @@ import { loadPinnedSources } from './sources';
  * analysis re-runs stage 6 only. A stage-6 failure caused by the document (refusal, truncation)
  * still ends in READY, because the deterministic result stands on its own.
  */
-export interface AnalysisDeps {
+export interface AnalysisDeps extends Pick<StatusEventDeps, 'events' | 'push'> {
   db: Db;
   llm: LlmClient;
   log: { info(o: object, m?: string): void; warn(o: object, m?: string): void };
@@ -36,6 +38,10 @@ export type StoredAnalysis = StructuredAnalysisV1 & {
     reported_datetime_raw: string | null;
   };
   extractionModel: string;
+  /** Stage 3's section proposals, kept so a reanalysis can merge again without a new LLM call. */
+  llmCitedSections?: LlmCitedSection[];
+  /** User corrections (TRD §8.5), written by the API's PATCH. */
+  corrections?: StoredCorrections;
 };
 
 export type RoleAnalysisRecord =
@@ -43,8 +49,8 @@ export type RoleAnalysisRecord =
   | { status: 'UNAVAILABLE'; reason: 'NO_SECTION_TEXT'; role: AnalysisRole }
   | { status: 'FAILED'; code: string; role: AnalysisRole };
 
-export async function processAnalysisJob(deps: AnalysisDeps, job: { artifactId: string; ownerUserId: string }): Promise<AnalysisOutcome> {
-  const repo = scoped(deps.db, job.ownerUserId);
+export async function processAnalysisJob(deps: AnalysisDeps, job: AnalysisJob): Promise<AnalysisOutcome> {
+  const repo = trackedRepo(deps.db, job.ownerUserId, deps);
   const artifact = await repo.artifacts.findById(job.artifactId);
   if (!artifact) return { status: 'SKIPPED', reason: 'deleted or not found' };
   if (!artifact.processingStatus || !STARTABLE.includes(artifact.processingStatus)) return { status: 'SKIPPED', reason: `status ${artifact.processingStatus}` };
@@ -58,13 +64,25 @@ export async function processAnalysisJob(deps: AnalysisDeps, job: { artifactId: 
   }
 
   try {
-    // Stages 3–5, unless a previous attempt already saved them.
-    let analysis = artifact.processingStatus === 'ANALYZING' ? (artifact.structuredAnalysis as StoredAnalysis | null) : null;
+    const stored = artifact.structuredAnalysis as StoredAnalysis | null;
+    let analysis: StoredAnalysis | null = null;
+    if (job.mode === 'reanalyze') {
+      // TRD §8.5: stages 4–6 again from the stored extraction plus the user's corrections; no LLM
+      // extraction. Deterministic, so a retry simply recomputes.
+      if (!stored) return { status: 'SKIPPED', reason: 'nothing to reanalyze' };
+      analysis = await reanalyze(deps.db, text, stored);
+      if (!(await repo.artifacts.setProcessing(job.artifactId, { processingStatus: 'ANALYZING', processingError: null, structuredAnalysis: analysis }))) {
+        return { status: 'SKIPPED', reason: 'deleted during processing' };
+      }
+    } else if (artifact.processingStatus === 'ANALYZING') {
+      // A retry after a stage-6 failure: stages 3–5 are already saved.
+      analysis = stored;
+    }
     if (!analysis) {
       const { extraction, model } = await extractFir(deps.llm, text);
       if (!(await repo.artifacts.setProcessing(job.artifactId, { processingStatus: 'SCHEDULE_LOOKUP' }))) return { status: 'SKIPPED', reason: 'deleted during processing' };
       const post = await postProcessFir(deps.db, { text, extraction });
-      analysis = { ...post, documentKind: 'FIR', fir: firFields(extraction), extractionModel: model };
+      analysis = { ...post, documentKind: 'FIR', fir: firFields(extraction), extractionModel: model, llmCitedSections: extraction.cited_sections };
       // Deterministic results are visible from here on, while stage 6 runs.
       if (!(await repo.artifacts.setProcessing(job.artifactId, { processingStatus: 'ANALYZING', processingError: null, structuredAnalysis: analysis }))) {
         return { status: 'SKIPPED', reason: 'deleted during processing' };
@@ -119,6 +137,21 @@ async function runRoleAnalysis(deps: AnalysisDeps, ownerUserId: string, text: st
     if (err instanceof LlmNotConfiguredError) return { status: 'FAILED', code: 'LLM_NOT_CONFIGURED', role };
     throw err;
   }
+}
+
+/** Stages 4–5 on stored data: corrected dates / sections win over the extracted ones. */
+async function reanalyze(db: Db, text: string, stored: StoredAnalysis): Promise<StoredAnalysis> {
+  const c = stored.corrections;
+  const post = await postProcessFir(db, {
+    text,
+    extraction: {
+      occurrence_datetime: c && 'occurrence_datetime' in c ? (c.occurrence_datetime ?? null) : stored.fir.occurrence_datetime_raw,
+      reported_datetime: c && 'reported_datetime' in c ? (c.reported_datetime ?? null) : stored.fir.reported_datetime_raw,
+      cited_sections: stored.llmCitedSections ?? [],
+    },
+    ...(c?.cited_sections ? { userSections: c.cited_sections } : {}),
+  });
+  return { ...stored, ...post, ...(c ? { corrections: { ...c, needsReanalysis: false } } : {}) };
 }
 
 function firFields(x: FirExtraction): StoredAnalysis['fir'] {

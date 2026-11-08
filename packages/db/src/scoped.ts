@@ -302,6 +302,53 @@ export function scoped(db: Db, userId: string) {
       return res.affectedRows === 1;
     },
 
+    /**
+     * Saves user corrections to a finished analysis (TRD §8.5). Optimistic concurrency like case
+     * edits (TRD §5.4), and only while no pipeline stage is running (status READY): a correction
+     * must never race the worker writing the same JSON.
+     */
+    async updateAnalysis(artifactId: string, expectedVersion: number, structuredAnalysis: unknown): Promise<UpdateResult<CaseArtifact> | { status: 'busy'; current: CaseArtifact }> {
+      const current = await artifactsRepo.findById(artifactId);
+      if (!current) return { status: 'not_found' };
+      if (current.processingStatus !== 'READY') return { status: 'busy', current };
+      const [res] = await db
+        .update(caseArtifacts)
+        .set({ structuredAnalysis, version: sql`${caseArtifacts.version} + 1` })
+        .where(
+          and(
+            eq(caseArtifacts.artifactId, artifactId),
+            eq(caseArtifacts.ownerUserId, userId),
+            isNull(caseArtifacts.deletedAt),
+            eq(caseArtifacts.version, expectedVersion),
+            eq(caseArtifacts.processingStatus, 'READY'),
+          ),
+        );
+      const after = await artifactsRepo.findById(artifactId);
+      if (!after) return { status: 'not_found' };
+      if (res.affectedRows === 1) return { status: 'ok', row: after };
+      return after.processingStatus === 'READY' ? { status: 'version_conflict', current: after } : { status: 'busy', current: after };
+    },
+
+    /**
+     * Moves a READY document back to SCHEDULE_LOOKUP for `/reanalyze` (stages 4–6). Conditional on
+     * READY, so two clicks cannot start two runs. Returns the row after the change, or null if it
+     * was not READY (or not this user's).
+     */
+    async startReanalysis(artifactId: string): Promise<CaseArtifact | null> {
+      const [res] = await db
+        .update(caseArtifacts)
+        .set({ processingStatus: 'SCHEDULE_LOOKUP', processingError: null })
+        .where(
+          and(
+            eq(caseArtifacts.artifactId, artifactId),
+            eq(caseArtifacts.ownerUserId, userId),
+            isNull(caseArtifacts.deletedAt),
+            eq(caseArtifacts.processingStatus, 'READY'),
+          ),
+        );
+      return res.affectedRows === 1 ? artifactsRepo.findById(artifactId) : null;
+    },
+
     async softDelete(artifactId: string): Promise<boolean> {
       const [res] = await db
         .update(caseArtifacts)

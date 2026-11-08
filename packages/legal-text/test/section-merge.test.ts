@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeCitedSections } from '../src/section-merge';
+import { mergeCitedSections, userCitedSections } from '../src/section-merge';
 
 const FIR =
   'আসামীগণ পরস্পর যোগসাজশে বাদীকে মারপিট করিয়া গুরুতর জখম করে। দণ্ডবিধির ৩২৩/৩২৫/৩০৭/৩৪ ধারায় মামলা রুজু করা হইল। ' +
@@ -55,5 +55,26 @@ describe('mergeCitedSections', () => {
       { act_hint: null, section: '৩', raw: '৩' },
     ]);
     expect(r.rejected.map((x) => x.reason)).toEqual(['UNREADABLE_SECTION', 'NOT_FOUND_IN_TEXT']);
+  });
+});
+
+describe('userCitedSections (BE-26 corrections)', () => {
+  it('builds authoritative rows from what the user typed: Act from the hint, clause as sub-section', () => {
+    const r = userCitedSections(
+      [
+        { act_hint: 'দণ্ডবিধি', section: '৩২৫' },
+        { act_hint: 'নারী ও শিশু নির্যাতন দমন আইন', section: '১১(গ)' },
+        { act_hint: null, section: '379' },
+        { act_hint: 'Penal Code', section: '325' }, // duplicate of the first
+        { act_hint: null, section: 'ধারা' }, // unreadable
+      ],
+      { defaultAct: 'PENAL_CODE' },
+    );
+    expect(r.sections.map((s) => [s.act?.key, s.key, s.subsection, s.actInferred, s.source])).toEqual([
+      ['PENAL_CODE', '325', null, false, 'USER_CORRECTED'],
+      ['NARI_SHISHU', '11', '(গ)', false, 'USER_CORRECTED'],
+      ['PENAL_CODE', '379', null, true, 'USER_CORRECTED'],
+    ]);
+    expect(r.rejected).toEqual([{ section: 'ধারা', actHint: null, reason: 'UNREADABLE_SECTION' }]);
   });
 });

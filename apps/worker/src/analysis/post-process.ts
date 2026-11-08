@@ -1,5 +1,5 @@
 import type { Db } from '@lawassist/db';
-import { filingDelay, mergeCitedSections, parseFirDateTime, type FilingDelay, type FirDateTime, type LlmCitedSection, type RejectedSection } from '@lawassist/legal-text';
+import { filingDelay, mergeCitedSections, parseFirDateTime, userCitedSections, type FilingDelay, type FirDateTime, type LlmCitedSection, type RejectedSection } from '@lawassist/legal-text';
 import { joinScheduleII, type TaggedSection } from './schedule';
 
 /**
@@ -32,6 +32,8 @@ export interface PostProcessInput {
   /** `raw_extracted_text` after Bijoy conversion. */
   text: string;
   extraction: FirExtractionInput;
+  /** Sections the user corrected (TRD §8.5): they replace the detector + LLM merge. */
+  userSections?: { act_hint: string | null; section: string }[];
   /** Injected for tests; Dhaka "today" otherwise. */
   today?: string;
 }
@@ -42,7 +44,9 @@ export async function postProcessFir(db: Db, input: PostProcessInput): Promise<S
   const occurrence = parseFirDateTime(input.extraction.occurrence_datetime);
   const reported = parseFirDateTime(input.extraction.reported_datetime);
   // FIRs: an unnamed Act is the Penal Code, flagged act_inferred (TRD §8.4).
-  const merged = mergeCitedSections(input.text, input.extraction.cited_sections, { defaultAct: 'PENAL_CODE' });
+  const merged = input.userSections
+    ? userCitedSections(input.userSections, { defaultAct: 'PENAL_CODE' })
+    : mergeCitedSections(input.text, input.extraction.cited_sections, { defaultAct: 'PENAL_CODE' });
 
   const scheduleDateBasis = occurrence ? 'OCCURRENCE' : reported ? 'REPORTED' : 'TODAY';
   const scheduleDate = occurrence?.date ?? reported?.date ?? input.today ?? dhakaToday();

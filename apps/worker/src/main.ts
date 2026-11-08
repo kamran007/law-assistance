@@ -22,6 +22,7 @@ export const SCRAPE_QUEUE = 'scrape';
 export const OUTBOX_QUEUE = 'outbox';
 
 const documentJobSchema = z.object({ artifactId: z.uuid(), ownerUserId: z.uuid() });
+const analysisJobSchema = documentJobSchema.extend({ mode: z.enum(['full', 'reanalyze']).optional() });
 
 const scrapeJobSchema = z.object({
   kind: z.enum(['NIGHTLY', 'FULL', 'MANUAL']),
@@ -77,21 +78,21 @@ async function main() {
     if (!job) return;
     const parsed = documentJobSchema.safeParse(job.data);
     if (parsed.success && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      void markFailedAfterRetries(ctx.db, parsed.data).catch((e: unknown) => ctx.log.error({ jobId: job.id, err: String(e) }, 'could not mark scan failed'));
+      void markFailedAfterRetries(ctx.db, parsed.data, ctx.scan).catch((e: unknown) => ctx.log.error({ jobId: job.id, err: String(e) }, 'could not mark scan failed'));
     }
   });
 
   // Stages 3–5 (TRD §8.2): LLM extraction + deterministic post-processing + Schedule II.
   const analysisWorker = new Worker(
     ANALYSIS_QUEUE,
-    async (job) => processAnalysisJob({ db: ctx.db, llm: ctx.llm, log: ctx.log }, documentJobSchema.parse(job.data)),
+    async (job) => processAnalysisJob({ db: ctx.db, llm: ctx.llm, log: ctx.log, events: ctx.events, push: ctx.push }, analysisJobSchema.parse(job.data)),
     { connection, concurrency: 4, lockDuration: 5 * 60_000 },
   );
   analysisWorker.on('failed', (job) => {
     if (!job) return;
     const parsed = documentJobSchema.safeParse(job.data);
     if (parsed.success && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      void markFailedAfterRetries(ctx.db, parsed.data).catch((e: unknown) => ctx.log.error({ jobId: job.id, err: String(e) }, 'could not mark analysis failed'));
+      void markFailedAfterRetries(ctx.db, parsed.data, ctx.scan).catch((e: unknown) => ctx.log.error({ jobId: job.id, err: String(e) }, 'could not mark analysis failed'));
     }
   });
 

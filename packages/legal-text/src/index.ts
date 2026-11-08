@@ -9,6 +9,7 @@ export { redactContactIds, PHONE_PLACEHOLDER, NID_PLACEHOLDER, type RedactionRes
 export { parseFirDateTime, filingDelay, dhakaToUtc, type FirDateTime, type FirDateTimeFlag, type FilingDelay } from './fir-datetime';
 export {
   mergeCitedSections,
+  userCitedSections,
   type LlmCitedSection,
   type MergedSection,
   type RejectedSection,

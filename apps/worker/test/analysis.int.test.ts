@@ -1,6 +1,6 @@
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import { createDb, crpcScheduleMetadata, newId, runMigrations, scoped, statutes, statuteSections, users, type CaseArtifact, type Db } from '@lawassist/db';
-import { CircuitBreaker, LlmNotConfiguredError, LlmRefusalError, type LlmClient, type StructuredRequest } from '@lawassist/providers';
+import { CircuitBreaker, LlmNotConfiguredError, LlmRefusalError, MemoryArtifactEvents, type LlmClient, type StructuredRequest } from '@lawassist/providers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FirExtraction } from '../src/analysis/extract';
 import { processAnalysisJob, type RoleAnalysisRecord, type StoredAnalysis } from '../src/analysis/job';
@@ -260,5 +260,65 @@ describe('processAnalysisJob', () => {
     const mine = await extractedDoc();
     expect(await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, { artifactId: mine.artifactId, ownerUserId: newId() })).toMatchObject({ status: 'SKIPPED' });
     expect((await row(mine.artifactId)).processingStatus).toBe('EXTRACTING');
+  });
+});
+
+describe('status events and reanalysis (BE-26)', () => {
+  it('publishes every status change (ids and status only) and calls the push hook once at READY', async () => {
+    const events = new MemoryArtifactEvents();
+    const pushed: { userId: string; artifactId: string; status: string }[] = [];
+    const job = await extractedDoc();
+    await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet, events, push: { documentFinished: async (n) => void pushed.push(n) } }, job);
+    expect(events.published.map((e) => e.status)).toEqual(['SCHEDULE_LOOKUP', 'ANALYZING', 'READY']);
+    expect(events.published.every((e) => e.artifact_id === job.artifactId && e.error === null)).toBe(true);
+    expect(JSON.stringify(events.published)).not.toMatch(/করিম|রহিম/);
+    expect(pushed).toEqual([{ userId: citizen, artifactId: job.artifactId, status: 'READY' }]);
+  });
+
+  it('a failing publisher or push hook never fails the job', async () => {
+    const job = await extractedDoc();
+    const broken = { publish: async () => Promise.reject(new Error('redis down')) };
+    const warnings: object[] = [];
+    const out = await processAnalysisJob(
+      { db, llm: fakeLlm('ok'), log: { info: () => undefined, warn: (o) => void warnings.push(o) }, events: broken, push: { documentFinished: async () => Promise.reject(new Error('fcm down')) } },
+      job,
+    );
+    expect(out).toMatchObject({ status: 'READY' });
+    expect((await row(job.artifactId)).processingStatus).toBe('READY');
+    expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it('reanalyze: corrected date and sections replace the extracted ones, without a new extraction', async () => {
+    const job = await extractedDoc();
+    await processAnalysisJob({ db, llm: fakeLlm('ok'), log: quiet }, job);
+    const repo = scoped(db, citizen);
+    const first = (await row(job.artifactId)).structuredAnalysis as StoredAnalysis;
+    expect(first.llmCitedSections).toHaveLength(2); // kept for later reanalysis
+
+    // What the API's PATCH stores: the user says it was s.325 (not 323/34) and corrects the date.
+    const corrected = {
+      ...first,
+      corrections: {
+        occurrence_datetime: '১২/০৩/২০২৪ খ্রিঃ সন্ধ্যা ৭.০০ ঘটিকা',
+        cited_sections: [{ act_hint: 'দণ্ডবিধি', section: '৩২৫' }],
+        fields: ['occurrence_datetime', 'cited_sections'],
+        correctedAt: new Date().toISOString(),
+        needsReanalysis: true,
+      },
+    };
+    const current = (await row(job.artifactId)).version;
+    expect((await repo.artifacts.updateAnalysis(job.artifactId, current, corrected)).status).toBe('ok');
+    expect(await repo.artifacts.startReanalysis(job.artifactId)).not.toBeNull();
+
+    const llm = fakeLlm('ok');
+    expect(await processAnalysisJob({ db, llm, log: quiet }, { ...job, mode: 'reanalyze' })).toMatchObject({ status: 'READY', roleAnalysis: 'READY' });
+    expect(llm.calls.map((c) => c.schemaName)).toEqual(['citizen_analysis']); // no stage 3
+
+    const s = (await row(job.artifactId)).structuredAnalysis as StoredAnalysis;
+    expect(s.sections.map((x) => [x.act?.key, x.key, x.source])).toEqual([['PENAL_CODE', '325', 'USER_CORRECTED']]);
+    expect(s.occurrence).toMatchObject({ date: '2024-03-12', time: '19:00' });
+    expect(s.filingDelay.minutes).toBe(900); // 19:00 → next day 10:00
+    expect(s.corrections).toMatchObject({ needsReanalysis: false, fields: ['occurrence_datetime', 'cited_sections'] });
+    expect(s.fir.police_station).toBe('মিরপুর মডেল'); // untouched fields survive
   });
 });

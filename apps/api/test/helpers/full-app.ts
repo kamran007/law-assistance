@@ -1,6 +1,7 @@
 import { MySqlContainer, type StartedMySqlContainer } from '@testcontainers/mysql';
 import { loadConfig } from '@lawassist/config';
 import { createDb, newId, runMigrations, users, type Db, type UserRole } from '@lawassist/db';
+import { MemoryArtifactEvents } from '@lawassist/providers';
 import { buildApp, type App } from '../../src/app';
 import { jwtAuthenticate } from '../../src/modules/auth/authenticate';
 import { AuthService } from '../../src/modules/auth/service';
@@ -35,6 +36,10 @@ export interface FullApp {
   storage: MemoryDocumentStorage;
   /** Scan jobs the API enqueued, in order. */
   scanJobs: { artifactId: string; ownerUserId: string }[];
+  /** Reanalysis jobs the API enqueued, in order. */
+  analysisJobs: { artifactId: string; ownerUserId: string }[];
+  /** In-process status events (hub + publisher). */
+  events: MemoryArtifactEvents;
   /** Inserts a user and returns a valid access token for them. */
   user(role: UserRole, verificationStatus?: 'NOT_REQUIRED' | 'PENDING' | 'VERIFIED' | 'REJECTED'): Promise<{ userId: string; token: string }>;
   stop(): Promise<void>;
@@ -54,12 +59,23 @@ export async function startFullApp(opts: { today?: string } = {}): Promise<FullA
   const today = () => opts.today ?? '2026-11-04';
   const storage = new MemoryDocumentStorage();
   const scanJobs: FullApp['scanJobs'] = [];
+  const analysisJobs: FullApp['analysisJobs'] = [];
+  const events = new MemoryArtifactEvents();
   const app = await buildApp(loadConfig({ NODE_ENV: 'test', DATABASE_URL: url }), {
     statutes: { repo: new StatutesRepository(db), cache: noCache, authenticate, today },
     auth: { service: new AuthService({ db, tokens, sender: { send: async () => undefined }, otpKey: 'k'.repeat(32) }), authenticate, secureCookies: true },
     cases: { db, authenticate, today },
     conversations: { db, authenticate },
-    documents: { db, authenticate, storage, queue: { enqueue: async (job) => void scanJobs.push(job) } },
+    documents: {
+      db,
+      authenticate,
+      storage,
+      queue: { enqueue: async (job) => void scanJobs.push(job) },
+      analysis: { enqueueReanalysis: async (job) => void analysisJobs.push(job) },
+      events,
+      publisher: events,
+      sse: { heartbeatMs: 50, maxStreamMs: 2_000 },
+    },
   });
   await app.ready();
 
@@ -70,6 +86,8 @@ export async function startFullApp(opts: { today?: string } = {}): Promise<FullA
     tokens,
     storage,
     scanJobs,
+    analysisJobs,
+    events,
     async user(role, verificationStatus) {
       const userId = newId();
       const vs = verificationStatus ?? (role === 'LAWYER' || role === 'JUDGE' ? 'VERIFIED' : 'NOT_REQUIRED');

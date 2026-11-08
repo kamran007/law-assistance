@@ -12,3 +12,12 @@ export interface DocumentJob {
   artifactId: string;
   ownerUserId: string;
 }
+
+/**
+ * `analysis` queue payload. `reanalyze` (TRD §8.5) re-runs stages 4–6 from the stored extraction
+ * and the user's corrections, without a new LLM extraction. Its job id must be unique per run:
+ * BullMQ ignores an add whose id it still remembers.
+ */
+export interface AnalysisJob extends DocumentJob {
+  mode?: 'full' | 'reanalyze';
+}

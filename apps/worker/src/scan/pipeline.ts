@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { scoped, type CaseArtifact, type Db } from '@lawassist/db';
 import { convertBijoyDocument, looksLikeBijoy } from '@lawassist/legal-text';
 import { OcrNotConfiguredError, type OcrProvider } from '@lawassist/providers';
+import { trackedRepo, type StatusEventDeps } from '../status-events';
 import { ToolError, type DocumentTools } from './tools';
 
 /**
@@ -21,7 +22,7 @@ export interface AnalysisQueue {
   enqueue(job: { artifactId: string; ownerUserId: string }): Promise<void>;
 }
 
-export interface ScanDeps {
+export interface ScanDeps extends Pick<StatusEventDeps, 'events' | 'push'> {
   db: Db;
   tools: DocumentTools;
   ocr: OcrProvider;
@@ -50,7 +51,7 @@ export type ScanOutcome = { status: 'EXTRACTED'; method: 'TEXT_LAYER' | 'DOCX' |
 const STARTABLE: CaseArtifact['processingStatus'][] = ['UPLOADED', 'OCR'];
 
 export async function processScanJob(deps: ScanDeps, job: { artifactId: string; ownerUserId: string }): Promise<ScanOutcome> {
-  const repo = scoped(deps.db, job.ownerUserId);
+  const repo = trackedRepo(deps.db, job.ownerUserId, deps);
   const artifact = await repo.artifacts.findById(job.artifactId);
   if (!artifact) return { status: 'SKIPPED', reason: 'deleted or not found' };
   if (!STARTABLE.includes(artifact.processingStatus)) return { status: 'SKIPPED', reason: `already ${artifact.processingStatus}` };
@@ -142,6 +143,6 @@ async function fail(repo: ReturnType<typeof scoped>, artifactId: string, code: s
 }
 
 /** Called by the queue worker when a job has used up its retries on an infrastructure error. */
-export async function markFailedAfterRetries(db: Db, job: { artifactId: string; ownerUserId: string }): Promise<void> {
-  await scoped(db, job.ownerUserId).artifacts.setProcessing(job.artifactId, { processingStatus: 'FAILED', processingError: 'PROCESSING_ERROR' });
+export async function markFailedAfterRetries(db: Db, job: { artifactId: string; ownerUserId: string }, deps: StatusEventDeps = { log: console }): Promise<void> {
+  await trackedRepo(db, job.ownerUserId, deps).artifacts.setProcessing(job.artifactId, { processingStatus: 'FAILED', processingError: 'PROCESSING_ERROR' });
 }
