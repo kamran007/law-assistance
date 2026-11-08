@@ -19,7 +19,7 @@ export {
 export type { QdrantClient } from '@qdrant/js-client-rest';
 export { STATUTE_CACHE_PREFIX, statuteGenerationKey } from './cache-keys';
 export { notConfiguredOcr, OcrNotConfiguredError, type OcrPageResult, type OcrProvider } from './ocr';
-export { SCAN_QUEUE, SCAN_JOB, ANALYSIS_QUEUE, ANALYSIS_JOB, type DocumentJob, type AnalysisJob } from './queues';
+export { SCAN_QUEUE, SCAN_JOB, ANALYSIS_QUEUE, ANALYSIS_JOB, SCOB_QUEUE, SCOB_CRAWL_JOB, SCOB_JUDGMENT_QUEUE, SCOB_JUDGMENT_JOB, type DocumentJob, type AnalysisJob } from './queues';
 export {
   createLlmClient,
   CircuitBreaker,

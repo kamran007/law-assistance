@@ -13,6 +13,9 @@ import {
 } from '@lawassist/providers';
 import { createPushNotifier } from './push';
 import { S3DocumentObjects } from './scan/objects';
+import { BullScobJudgmentQueue } from './scob/queue';
+import { SCOB_SOURCE_CONFIG } from './scob/source-config';
+import type { ScobCrawlDeps } from './scob/crawl';
 import { CliDocumentTools } from './scan/tools';
 import { SectionIndexer } from './index/indexer';
 import { PoliteHttpClient } from './scrape/http-client';
@@ -45,6 +48,17 @@ export function createWorkerContext() {
     onActSynced: async (bdlawsActId) => {
       await redis.incr(statuteGenerationKey(bdlawsActId));
     },
+  };
+
+  // SCOB case law (TRD §6A): its own HTTP client and limiter (the bdlaws limiter is unchanged),
+  // writes through the scraper connection like the statute crawl.
+  const scobQueue = BullScobJudgmentQueue.create({ url: cfg.REDIS_URL, maxRetriesPerRequest: null });
+  const scob: ScobCrawlDeps = {
+    db: scraperDb?.db ?? db,
+    http: new PoliteHttpClient({ config: SCOB_SOURCE_CONFIG }),
+    snapshots: scrape.snapshots,
+    queue: scobQueue,
+    log,
   };
 
   const qdrant = createQdrantClient({ url: cfg.QDRANT_URL, apiKey: cfg.QDRANT_API_KEY });
@@ -82,6 +96,7 @@ export function createWorkerContext() {
     log,
     db,
     scrape,
+    scob,
     scan,
     llm,
     events,
@@ -92,6 +107,7 @@ export function createWorkerContext() {
     async close() {
       await closeDb();
       await scraperDb?.close();
+      await scobQueue.close();
       redis.disconnect();
     },
   };

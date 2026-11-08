@@ -74,8 +74,11 @@ export class RobotsDisallowedError extends Error {
   }
 }
 
+/** The settings the client uses; bdlaws and SCOB each pass their own (TRD §6.1, §6A.1). */
+export type HttpClientConfig = Pick<SourceConfig, 'baseUrl' | 'userAgent' | 'minIntervalMs' | 'requestTimeoutMs' | 'maxRetries'>;
+
 export interface PoliteHttpClientOptions {
-  config: SourceConfig;
+  config: HttpClientConfig;
   fetch?: FetchLike;
   limiter?: IntervalLimiter;
   cache?: ConditionalCache;
@@ -93,7 +96,7 @@ const MAX_BACKOFF_MS = 60_000;
  * Every attempt, including retries and the robots.txt fetch, goes through the limiter.
  */
 export class PoliteHttpClient {
-  private readonly cfg: SourceConfig;
+  private readonly cfg: HttpClientConfig;
   private readonly doFetch: FetchLike;
   private readonly limiter: IntervalLimiter;
   private readonly cache: ConditionalCache;
@@ -132,6 +135,16 @@ export class PoliteHttpClient {
     if (lastModified) validators.lastModified = lastModified;
     if (etag || lastModified) await this.cache.set(url, validators);
     return { kind: 'ok', url, body, fetchedAt, validators };
+  }
+
+  /**
+   * Raw bytes (no decoding, no conditional GET): for pages whose encoding needs special handling
+   * (SCOB mixes UTF-8 and Windows-1252) and for binary files such as judgment PDFs.
+   */
+  async getBytes(url: string, accept = '*/*'): Promise<{ url: string; bytes: Uint8Array; contentType: string | null; fetchedAt: Date }> {
+    if (!(await this.isAllowed(url))) throw new RobotsDisallowedError(url);
+    const res = await this.request(url, { 'user-agent': this.cfg.userAgent, accept });
+    return { url, bytes: new Uint8Array(await res.arrayBuffer()), contentType: res.headers.get('content-type'), fetchedAt: this.now() };
   }
 
   private async request(url: string, headers: Record<string, string>) {

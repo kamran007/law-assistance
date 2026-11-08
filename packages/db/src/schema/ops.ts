@@ -5,11 +5,15 @@ import { SCRAPE_RUN_STATUSES } from './enums';
 
 export const scrapeRuns = mysqlTable('scrape_runs', {
   runId: uuidBin('run_id').primaryKey(),
-  kind: mysqlEnum('kind', ['NIGHTLY', 'FULL', 'MANUAL']).notNull(),
+  /** bdlaws statutes (TRD §6.1) or SCOB judgments (TRD §6A). */
+  source: mysqlEnum('source', ['BDLAWS', 'SCOB']).notNull().default('BDLAWS'),
+  kind: mysqlEnum('kind', ['NIGHTLY', 'FULL', 'MANUAL', 'WEEKLY', 'BACKFILL']).notNull(),
   status: mysqlEnum('status', SCRAPE_RUN_STATUSES).notNull().default('RUNNING'),
   actsChecked: int('acts_checked').notNull().default(0),
   sectionsChanged: int('sections_changed').notNull().default(0),
   error: text('error'),
+  /** Source-specific counts (SCOB: issues, lists, rows, queued). */
+  details: json('details'),
   startedAt: dt('started_at').notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   finishedAt: dt('finished_at'),
 });

@@ -8,6 +8,8 @@ import { processAnalysisJob } from './analysis/job';
 import { BullAnalysisQueue } from './scan/objects';
 import { markFailedAfterRetries, processScanJob } from './scan/pipeline';
 import { runScrape } from './scrape/run-scrape';
+import { runScobCrawl } from './scob/crawl';
+import { SCOB_QUEUE } from '@lawassist/providers';
 
 /**
  * Worker process (TRD §3.1). Queues:
@@ -23,6 +25,12 @@ export const OUTBOX_QUEUE = 'outbox';
 
 const documentJobSchema = z.object({ artifactId: z.uuid(), ownerUserId: z.uuid() });
 const analysisJobSchema = documentJobSchema.extend({ mode: z.enum(['full', 'reanalyze']).optional() });
+
+const scobCrawlJobSchema = z.object({
+  kind: z.enum(['WEEKLY', 'BACKFILL', 'MANUAL']),
+  issues: z.array(z.number().int().positive()).optional(),
+  all: z.boolean().optional(),
+});
 
 const scrapeJobSchema = z.object({
   kind: z.enum(['NIGHTLY', 'FULL', 'MANUAL']),
@@ -47,6 +55,23 @@ async function main() {
     { pattern: '0 3 * * 5', tz: 'Asia/Dhaka' },
     { name: 'scrape', data: { kind: 'FULL' }, opts: { removeOnComplete: 50, removeOnFail: 200 } },
   );
+
+  // SCOB case law (TRD §6A.1): weekly, Saturday 04:00 Dhaka, only when enabled (PRE-11: site terms).
+  const scobQueue = new Queue(SCOB_QUEUE, { connection });
+  if (ctx.cfg.SCOB_CRAWL_ENABLED) {
+    await scobQueue.upsertJobScheduler(
+      'scob-weekly',
+      { pattern: '0 4 * * 6', tz: 'Asia/Dhaka' },
+      { name: 'scob', data: { kind: 'WEEKLY' }, opts: { removeOnComplete: 50, removeOnFail: 200 } },
+    );
+  } else {
+    await scobQueue.removeJobScheduler('scob-weekly');
+  }
+  const scobWorker = new Worker(SCOB_QUEUE, async (job) => runScobCrawl(ctx.scob, scobCrawlJobSchema.parse(job.data)), {
+    connection,
+    concurrency: 1,
+    lockDuration: 10 * 60_000,
+  });
 
   const outboxQueue = new Queue(OUTBOX_QUEUE, { connection });
   await outboxQueue.upsertJobScheduler(
@@ -98,6 +123,7 @@ async function main() {
 
   for (const [name, w] of [
     ['scrape', scrapeWorker],
+    ['scob', scobWorker],
     ['outbox', outboxWorker],
     ['scan', scanWorker],
     ['analysis', analysisWorker],
@@ -108,8 +134,8 @@ async function main() {
 
   const shutdown = async () => {
     ctx.log.info({}, 'shutting down');
-    await Promise.all([scrapeWorker.close(), outboxWorker.close(), scanWorker.close(), analysisWorker.close()]);
-    await Promise.all([scrapeQueue.close(), outboxQueue.close(), analysis.close()]);
+    await Promise.all([scrapeWorker.close(), scobWorker.close(), outboxWorker.close(), scanWorker.close(), analysisWorker.close()]);
+    await Promise.all([scrapeQueue.close(), scobQueue.close(), outboxQueue.close(), analysis.close()]);
     await ctx.close();
     process.exit(0);
   };

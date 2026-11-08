@@ -14,6 +14,7 @@ export const SCOB_SOURCE_CONFIG = {
   minIntervalMs: 3000,
   /** Judgment PDFs are up to a few MB (4.3 MB seen). */
   requestTimeoutMs: 120_000,
+  maxRetries: 4,
   /**
    * Division list links on the index. Issues 1–14 use the generic template
    * (`bulletin_list.php`), 15+ a per-issue page (`bulletin_list_AD_20.php`). Both carry

@@ -3,6 +3,7 @@ import { createWorkerContext } from './context';
 import { ensureChunkCollection, reindexAll } from './index/collection';
 import { drainOutbox } from './index/outbox';
 import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
+import { runScobCrawl } from './scob/crawl';
 
 /**
  * Manual runs (no queue):
@@ -11,6 +12,9 @@ import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
  *   scrape -- --setup-index                             create Qdrant collection + alias + payload indexes
  *   scrape -- --drain-outbox                            embed/index pending outbox events now
  *   scrape -- --reindex-all [--keep-previous]           rebuild the collection, swap the alias
+ *   scrape -- --scob [--issues 19,20] [--all]           SCOB crawl: queue judgments not stored yet (all with --all)
+ *   scrape -- --scob-backfill                           first full SCOB load (every issue)
+ * SCOB runs fetch the live Supreme Court site: check PRE-11 (site terms) before a production run.
  */
 const { values } = parseArgs({
   // pnpm may forward the "--" separator; drop it so options after it still parse.
@@ -25,6 +29,10 @@ const { values } = parseArgs({
     'drain-outbox': { type: 'boolean', default: false },
     'reindex-all': { type: 'boolean', default: false },
     'keep-previous': { type: 'boolean', default: false },
+    scob: { type: 'boolean', default: false },
+    'scob-backfill': { type: 'boolean', default: false },
+    issues: { type: 'string' },
+    all: { type: 'boolean', default: false },
   },
 });
 
@@ -42,6 +50,11 @@ try {
         { keepPrevious: values['keep-previous'] },
       ),
     );
+  } else if (values.scob || values['scob-backfill']) {
+    const issues = values.issues?.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
+    const summary = await runScobCrawl(ctx.scob, { kind: values['scob-backfill'] ? 'BACKFILL' : 'MANUAL', ...(issues?.length ? { issues } : {}), all: values.all });
+    print(summary);
+    process.exitCode = summary.status === 'FAILED' ? 1 : 0;
   } else if (values.snapshot) {
     if (!values.act) throw new Error('--snapshot needs --act');
     const out = await syncFromSnapshot(ctx.scrape, Number(values.act), values.snapshot, values.force);

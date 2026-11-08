@@ -25,6 +25,11 @@ export const envSchema = z.object({
   ),
 
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
+  /**
+   * Worker: register the weekly SCOB case-law crawl (TRD §6A.1). Off until the site's terms are
+   * checked (PRE-11); manual runs via the CLI work regardless.
+   */
+  SCOB_CRAWL_ENABLED: z.preprocess(emptyToUndefined, z.enum(['true', 'false']).default('false')).transform((v) => v === 'true'),
   QDRANT_URL: z.string().url().default('http://localhost:6333'),
   QDRANT_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   TEI_EMBED_URL: z.string().url().default('http://localhost:8081'),

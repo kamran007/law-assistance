@@ -21,3 +21,10 @@ export interface DocumentJob {
 export interface AnalysisJob extends DocumentJob {
   mode?: 'full' | 'reanalyze';
 }
+
+/** SCOB case-law crawl (TRD §6A.1): weekly, or a manual / backfill run. */
+export const SCOB_QUEUE = 'scob';
+export const SCOB_CRAWL_JOB = 'scob_crawl';
+/** One job per judgment: fetch, hash, text, metadata, links, write (TRD §6A.3; JUD-04). */
+export const SCOB_JUDGMENT_QUEUE = 'scob-judgment';
+export const SCOB_JUDGMENT_JOB = 'scob_judgment';

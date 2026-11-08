@@ -4,6 +4,8 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3
 /** Raw HTML snapshots, gzip-compressed (TRD §6.1): `raw/bdlaws/{act_id}/{fetched_at}.html.gz`. */
 export interface SnapshotStore {
   put(actId: number, fetchedAt: Date, html: string): Promise<string>;
+  /** Stores HTML gzip-compressed under an explicit key (SCOB list pages, TRD §6A.1). */
+  putKey(key: string, html: string): Promise<string>;
   get(key: string): Promise<string>;
 }
 
@@ -37,7 +39,10 @@ export class S3SnapshotStore implements SnapshotStore {
   }
 
   async put(actId: number, fetchedAt: Date, html: string): Promise<string> {
-    const key = snapshotKey(actId, fetchedAt);
+    return this.putKey(snapshotKey(actId, fetchedAt), html);
+  }
+
+  async putKey(key: string, html: string): Promise<string> {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -61,7 +66,10 @@ export class MemorySnapshotStore implements SnapshotStore {
   readonly objects = new Map<string, Buffer>();
 
   async put(actId: number, fetchedAt: Date, html: string): Promise<string> {
-    const key = snapshotKey(actId, fetchedAt);
+    return this.putKey(snapshotKey(actId, fetchedAt), html);
+  }
+
+  async putKey(key: string, html: string): Promise<string> {
     this.objects.set(key, gzipSync(Buffer.from(html, 'utf8')));
     return key;
   }
