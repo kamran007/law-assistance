@@ -210,6 +210,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-08 | ngram FULLTEXT indexes are built with stopwords off (migration 0005); judgment search uses BOOLEAN mode | With stopwords on, every bigram containing "a" or "i" was dropped; natural-language mode also ignores ngrams frequent in a small table. BOOLEAN mode on plain words matches each word as a phrase of its ngrams |
 | 2026-11-08 | Bijoy conversion needs non-English text, not just a Bijoy font in the PDF | English judgments embed SutonnyMJ for a quoted line; converting them destroyed the English text |
 | 2026-11-08 | A judgment that only states a hearing date keeps decision_date NULL | The decision can be weeks later; a wrong date misleads more than a missing one (EVAL-10 / LLM fallback / admin entry fill the rest) |
+| 2026-11-08 | Acts, case-law results and "Judgments on this section" are listed newest first (owner's request); a word search keeps the best match on top | Replaces TRD §5.1 "AD before HCD" for section judgments. Undated judgments are placed by their bulletin year; equal dates: later issue, AD before HCD |
 
 ## Next steps (in order)
 

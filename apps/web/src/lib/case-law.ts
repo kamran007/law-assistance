@@ -8,7 +8,7 @@ import { isStatus } from './cases';
 type Json<T> = T extends { content: { 'application/json': infer B } } ? B : never;
 export type SectionJudgments = Json<paths['/api/v1/statutes/{act_id}/sections/{sec}/judgments']['get']['responses'][200]>;
 
-/** Judgments that discuss a section (Appellate Division first, newest first), for the verifier and section pages. */
+/** Judgments that discuss a section (newest first), for the verifier and section pages. */
 export function useSectionJudgments(actId: number, sec: string, limit = 5) {
   return useQuery({
     queryKey: ['section-judgments', actId, sec, limit],

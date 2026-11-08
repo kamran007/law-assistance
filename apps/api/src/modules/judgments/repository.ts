@@ -31,8 +31,16 @@ export interface RefRow {
 }
 
 const likeEscape = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
-/** AD (binding) before HCD; newest first; unknown dates last. */
-const precedentOrder = [asc(judgments.division), sql`${judgments.decisionDate} IS NULL`, desc(judgments.decisionDate), desc(judgments.issueNumber), asc(judgments.serialNumber)];
+/**
+ * Newest first. A judgment without a decision date is placed by its bulletin year (start of the
+ * year), so it doesn't sink below decades of older cases. Ties: later issue, AD before HCD, serial.
+ */
+const newestFirst = [
+  desc(sql`COALESCE(${judgments.decisionDate}, MAKEDATE(${judgments.issueYear}, 1))`),
+  desc(judgments.issueNumber),
+  asc(judgments.division),
+  asc(judgments.serialNumber),
+];
 
 export class JudgmentsRepository {
   constructor(private readonly db: Db) {}
@@ -70,7 +78,8 @@ export class JudgmentsRepository {
       .select()
       .from(judgments)
       .where(cond)
-      .orderBy(...(match ? [desc(match)] : []), ...precedentOrder)
+      // A word search keeps the best match on top; otherwise newest first.
+      .orderBy(...(match ? [desc(match)] : []), ...newestFirst)
       .limit(p.limit)
       .offset(p.offset);
     return { total: Number(totalRow?.n ?? 0), items };
@@ -110,7 +119,7 @@ export class JudgmentsRepository {
     return row;
   }
 
-  /** Judgments linked to one section, AD first then newest, with the citing paragraphs merged. */
+  /** Judgments linked to one section, newest first, with the citing paragraphs merged. */
   async bySection(statuteId: string, key: string, page: { limit: number; offset: number }): Promise<{ total: number; items: { row: JudgmentRow; paragraphs: string[] }[] }> {
     const linked = and(eq(judgmentStatuteRefs.statuteId, statuteId), eq(judgmentStatuteRefs.normalizedSectionKey, key));
     const [totalRow] = await this.db.select({ n: sql<number>`COUNT(DISTINCT ${judgmentStatuteRefs.judgmentId})` }).from(judgmentStatuteRefs).where(linked);
@@ -118,7 +127,7 @@ export class JudgmentsRepository {
       .select()
       .from(judgments)
       .where(sql`EXISTS (SELECT 1 FROM ${judgmentStatuteRefs} r WHERE r.judgment_id = ${judgments.judgmentId} AND r.statute_id = ${uuidParam(statuteId)} AND r.normalized_section_key = ${key})`)
-      .orderBy(...precedentOrder)
+      .orderBy(...newestFirst)
       .limit(page.limit)
       .offset(page.offset);
     if (!rows.length) return { total: Number(totalRow?.n ?? 0), items: [] };

@@ -139,7 +139,7 @@ export const judgmentRoutes =
         config: { access: 'public' },
         schema: {
           tags: ['judgments'],
-          summary: 'Judgments that discuss this section (Appellate Division first, newest first)',
+          summary: 'Judgments that discuss this section (newest first)',
           params: sectionJudgmentsParams,
           querystring: sectionJudgmentsQuery,
           response: { 200: sectionJudgments },

@@ -39,7 +39,8 @@ export class StatutesRepository {
       .select()
       .from(statutes)
       .where(cond)
-      .orderBy(...(match ? [desc(match)] : []), asc(statutes.enactedDate), asc(statutes.bdlawsActId))
+      // Newest first (unknown dates last); a title search keeps the best match on top.
+      .orderBy(...(match ? [desc(match)] : []), sql`${statutes.enactedDate} IS NULL`, desc(statutes.enactedDate), desc(statutes.bdlawsActId))
       .limit(p.limit)
       .offset(p.offset);
     return { total: Number(totalRow?.n ?? 0), items };

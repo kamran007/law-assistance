@@ -443,7 +443,7 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Judgments that discuss this section (Appellate Division first, newest first) */
+        /** Judgments that discuss this section (newest first) */
         get: {
             parameters: {
                 query?: {

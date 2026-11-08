@@ -112,7 +112,7 @@ describe('GET /statutes', () => {
     expect((await get('/statutes?year=1860')).json().items.map((s: { act_id: number }) => s.act_id)).toEqual([11]);
     const page = (await get('/statutes?limit=2&offset=1')).json();
     expect(page).toMatchObject({ total: 3, limit: 2, offset: 1 });
-    expect(page.items.map((s: { act_id: number }) => s.act_id)).toEqual([16, 835]); // ordered by enactment date
+    expect(page.items.map((s: { act_id: number }) => s.act_id)).toEqual([16, 11]); // newest enactment first: 835 (2000), 16 (1867), 11 (1860)
   });
 
   it('rejects bad query parameters with a 422 problem', async () => {

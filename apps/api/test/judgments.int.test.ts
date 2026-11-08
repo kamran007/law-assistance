@@ -99,12 +99,13 @@ afterAll(async () => {
 const get = (url: string) => app.inject({ method: 'GET', url: `/api/v1${url}` });
 
 describe('GET /judgments', () => {
-  it('lists AD before HCD, newest first, unknown dates last; no login needed', async () => {
+  it('lists newest first (no decision date: placed by bulletin year); no login needed', async () => {
     const res = await get('/judgments');
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.total).toBe(3);
-    expect(body.items.map((i: { judgment_id: string }) => i.judgment_id)).toEqual([ids.ad, ids.scanned, ids.hcd]);
+    // HCD 2025-06-10, then the undated one from the 2025 bulletin, then AD 2019-08-25.
+    expect(body.items.map((i: { judgment_id: string }) => i.judgment_id)).toEqual([ids.hcd, ids.scanned, ids.ad]);
     expect(body.items[1]).toMatchObject({ text_available: false, decision_date: null });
   });
 
@@ -114,12 +115,12 @@ describe('GET /judgments', () => {
     expect(await pick('q=Karim')).toEqual([ids.hcd]);
     expect(await pick('division=HCD')).toEqual([ids.hcd]);
     expect(await pick('year=2019')).toEqual([ids.ad]);
-    expect(await pick('year=2025')).toEqual([ids.scanned, ids.hcd]); // no decision date → bulletin year
+    expect(await pick('year=2025')).toEqual([ids.hcd, ids.scanned]); // no decision date → bulletin year
     expect(await pick('judge=Iqbal')).toEqual([ids.ad]); // bench member
     expect(await pick('judge=zinat')).toEqual([ids.hcd]);
     expect(await pick('judge=50%25')).toEqual([]); // LIKE wildcards are escaped
     expect(await pick('act_id=11&sec=34')).toEqual([ids.hcd]);
-    expect(await pick('act_id=11&sec=৩০২')).toEqual([ids.ad, ids.scanned, ids.hcd]);
+    expect(await pick('act_id=11&sec=৩০২')).toEqual([ids.hcd, ids.scanned, ids.ad]);
     expect(await pick('act_id=999')).toEqual([]);
   });
 
@@ -167,11 +168,11 @@ describe('GET /statutes/{act}/sections/{sec}/judgments', () => {
     const body = res.json();
     expect(body).toMatchObject({ act_id: 11, sec: '302', total: 3 });
     expect(body.items.map((i: { judgment_id: string; older_than_current_version: boolean | null; paragraphs: string[] }) => [i.judgment_id, i.older_than_current_version, i.paragraphs])).toEqual([
-      [ids.ad, true, ['1']],
-      [ids.scanned, null, []],
       [ids.hcd, false, ['1']],
+      [ids.scanned, null, []],
+      [ids.ad, true, ['1']],
     ]);
-    expect(body.items[0].section_amended_on).toBe('2025-03-01');
+    expect(body.items[2].section_amended_on).toBe('2025-03-01');
   });
 
   it('an unamended section has no amendment date; paging works; unknown Act / section are 404', async () => {
