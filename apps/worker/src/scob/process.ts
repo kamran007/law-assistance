@@ -11,7 +11,7 @@ import type { Log } from '../scrape/run-scrape';
 import type { ScobJudgmentJob } from './crawl';
 import { parseJudgmentHeader } from './pdf-metadata';
 import { findStatuteRefs, replaceStatuteRefs, sectionKeysOf, StatuteLinker } from './statute-links';
-import { averageCharsPerPage, cleanPages, detectLanguage, markParagraphs, MIN_CHARS_PER_PAGE } from './text';
+import { averageCharsPerPage, cleanPages, commonBanglaShare, detectLanguage, markParagraphs, MIN_CHARS_PER_PAGE, MIN_COMMON_BANGLA_SHARE } from './text';
 
 /** TRD §6A.3 step 1. */
 export const MAX_JUDGMENT_PDF_BYTES = 50 * 1024 * 1024;
@@ -81,7 +81,10 @@ export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgme
   const joined = pages.join('\n');
   const bijoy = usable && looksLikeBijoy({ text: joined, fontNames });
   if (bijoy) pages = pages.map((p) => convertBijoyDocument(p));
-  const enoughText = usable && averageCharsPerPage(pages) >= MIN_CHARS_PER_PAGE;
+  // Converted from a legacy font: if the result isn't readable Bangla (another, unknown legacy
+  // encoding), keep it out of search and show the PDF instead until it is fixed (NEEDS_REVIEW).
+  const readable = !bijoy || commonBanglaShare(pages.join(' ')) >= MIN_COMMON_BANGLA_SHARE;
+  const enoughText = usable && readable && averageCharsPerPage(pages) >= MIN_CHARS_PER_PAGE;
   const header = parseJudgmentHeader(pages.slice(0, HEADER_PAGES).join('\n'));
   const { text: fullText, paragraphs } = markParagraphs(cleanPages(pages));
   const links = await (deps.linker ?? new StatuteLinker(deps.db)).resolve(findStatuteRefs(row.keyWords, fullText || null));
@@ -134,6 +137,6 @@ export async function processScobJudgment(deps: ScobProcessDeps, job: ScobJudgme
   });
 
   const statuteLinks = values.normalizedSectionKeys.length;
-  deps.log.info({ judgmentId, issue: row.issue, division: row.division, serial: row.serial, pages: pages.length, paragraphs, bijoy, statuteLinks, extraction: values.extractionStatus }, 'scob judgment stored');
+  deps.log.info({ judgmentId, issue: row.issue, division: row.division, serial: row.serial, pages: pages.length, paragraphs, bijoy, readable, statuteLinks, extraction: values.extractionStatus }, 'scob judgment stored');
   return { status: 'STORED', judgmentId, extraction: values.extractionStatus, changed: !existing || existing.pdfSha256 !== sha256, paragraphs, statuteLinks };
 }

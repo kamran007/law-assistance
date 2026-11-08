@@ -68,3 +68,20 @@ export function detectLanguage(text: string): 'EN' | 'BN' | 'MIXED' {
   const share = bn / total;
   return share > 0.8 ? 'BN' : share < 0.2 ? 'EN' : 'MIXED';
 }
+
+/**
+ * Very frequent Bangla words in judgments. Text converted from a legacy font the converter doesn't
+ * know comes out as Bengali letters that form almost none of them (seen in 7 SCOB judgments).
+ */
+const COMMON_BANGLA = new Set(
+  ['এবং', 'ও', 'এই', 'যে', 'না', 'করা', 'করে', 'হয়', 'হইয়া', 'হইতে', 'থেকে', 'তারিখ', 'আদালত', 'ধারা', 'মামলা', 'মামলার', 'বিভাগ', 'আইন', 'আইনের', 'রায়', 'আদেশ', 'দরখাস্ত', 'পক্ষ', 'বনাম', 'সরকার', 'জন্য', 'সাথে', 'তার', 'তাহার', 'কোন', 'কোনো', 'এর', 'বা'].map((w) => w.normalize('NFC')),
+);
+/** Below this share of common words among Bangla words, Bangla text is not readable. Readable SCOB judgments: 11–20 %; garbled ones: under 5 %. */
+export const MIN_COMMON_BANGLA_SHARE = 0.08;
+
+/** Share of very common Bangla words among the Bangla words of a text (1 when there are fewer than 50). */
+export function commonBanglaShare(text: string): number {
+  const words = text.normalize('NFC').match(/[\p{Script=Bengali}\p{M}]+/gu) ?? [];
+  if (words.length < 50) return 1;
+  return words.filter((w) => COMMON_BANGLA.has(w)).length / words.length;
+}

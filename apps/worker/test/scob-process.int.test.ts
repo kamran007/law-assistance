@@ -7,6 +7,7 @@ import type { ScobJudgmentJob } from '../src/scob/crawl';
 import { judgmentPdfKey, processScobJudgment, type ScobProcessDeps } from '../src/scob/process';
 import { scobJudgmentJobSchema } from '../src/scob/queue';
 import { relinkJudgments } from '../src/scob/statute-links';
+import { reprocessStoredJudgments } from '../src/scob/reprocess';
 
 /**
  * JUD-04 against MySQL 8.4 (Testcontainers). Download and PDF tools are fakes: the text comes from a
@@ -189,5 +190,23 @@ describe('processScobJudgment', () => {
     // Nothing new: no event.
     expect(await relinkJudgments(db, log, { judgmentIds: [j.judgmentId] })).toMatchObject({ changed: 0 });
     expect((await db.select().from(outboxEvents).where(eq(outboxEvents.aggregateId, j.judgmentId))).length).toBe(eventsBefore + 1);
+  });
+
+  it('reprocess: re-reads a stored judgment from its stored PDF with the current rules, no download, no revision', async () => {
+    const j = await byNaturalKey(1);
+    const revisionsBefore = (await db.select().from(judgmentRevisions).where(eq(judgmentRevisions.judgmentId, j.judgmentId))).length;
+    const h = harness({ pages: [headerPage, `${body(1)}\n${body(2)} Re-read with new rules.`] });
+    const fetched: string[] = [];
+    h.deps.http.getBytes = async () => {
+      throw new Error('must not download');
+    };
+    const objects = { put: h.deps.objects.put, get: async (key: string) => (fetched.push(key), h.stored.get(key) ?? pdf('v2')) };
+    const out = await reprocessStoredJudgments({ ...h.deps, objects }, h.deps.log, { judgmentIds: [j.judgmentId] });
+    expect(out).toMatchObject({ judgments: 1, ok: 1, failed: 0, withDecisionDate: 1 });
+    expect(fetched).toEqual([j.storedPdfKey]);
+    const after = await byNaturalKey(1);
+    expect(after.fullText).toContain('Re-read with new rules.');
+    expect(after.pdfSha256).toBe(j.pdfSha256);
+    expect((await db.select().from(judgmentRevisions).where(eq(judgmentRevisions.judgmentId, j.judgmentId))).length).toBe(revisionsBefore);
   });
 });

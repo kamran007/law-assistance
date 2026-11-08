@@ -31,9 +31,24 @@ export interface BijoyEvidence {
 /** Minimum share of Bijoy marks among non-space characters for text-only detection. */
 export const BIJOY_MARK_RATIO = 0.02;
 
+/** Very frequent English function words; Bijoy-encoded Bangla ("Avgiv", "‡h") practically never forms them. */
+const ENGLISH_WORDS = new Set(['the', 'of', 'and', 'to', 'in', 'is', 'that', 'for', 'by', 'on', 'with', 'as', 'was', 'be', 'it', 'this', 'are', 'not', 'or', 'from', 'has', 'have', 'which', 'an', 'at']);
+/** Share of English function words among Latin words above which a text is English. Plain English runs at 30–40 %. */
+export const ENGLISH_WORD_SHARE = 0.12;
+
+/** Share of English function words among the Latin-letter words of a text (0 when it has fewer than 30). */
+export function englishWordShare(text: string): number {
+  const words = text.match(/[A-Za-z]+/g) ?? [];
+  if (words.length < 30) return 0;
+  return words.filter((w) => ENGLISH_WORDS.has(w.toLowerCase())).length / words.length;
+}
+
 export function looksLikeBijoy({ text, fontNames = [] }: BijoyEvidence): boolean {
-  if (fontNames.some((f) => BIJOY_FONT.test(f.replace(/^[A-Z]{6}\+/, '')))) return true; // strip PDF subset prefix "ABCDEF+"
   const sample = text.slice(0, 20_000);
+  // An English document that merely embeds a Bijoy font (one Bangla quote, a letterhead) must not
+  // be converted: every English line would turn into Bangla glyphs (seen in 155 SCOB judgments).
+  if (englishWordShare(sample) >= ENGLISH_WORD_SHARE) return false;
+  if (fontNames.some((f) => BIJOY_FONT.test(f.replace(/^[A-Z]{6}\+/, '')))) return true; // strip PDF subset prefix "ABCDEF+"
   if (BENGALI.test(sample)) return false; // real Unicode Bangla is present
   let chars = 0;
   let marks = 0;

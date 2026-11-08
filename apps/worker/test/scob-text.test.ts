@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { averageCharsPerPage, cleanPages, detectLanguage, markParagraphs } from '../src/scob/text';
+import { averageCharsPerPage, cleanPages, commonBanglaShare, detectLanguage, markParagraphs, MIN_COMMON_BANGLA_SHARE } from '../src/scob/text';
 
 /** JUD-04 text steps: running head removal, paragraph markers, language, scanned check. */
 describe('cleanPages', () => {
@@ -38,5 +38,16 @@ describe('detectLanguage / averageCharsPerPage', () => {
   it('counts non-space characters per page (scanned PDFs have almost none)', () => {
     expect(averageCharsPerPage(['ab cd', '  ', 'efgh'])).toBe(8 / 3);
     expect(averageCharsPerPage([])).toBe(0);
+  });
+});
+
+describe('commonBanglaShare', () => {
+  it('readable Bangla is full of common words; text from an unknown legacy font is not', () => {
+    // From 18 SCOB [2023] HCD 3 and 15 SCOB [2021] HCD 4 after conversion (real SCOB text).
+    const readable = 'তার মতে পুলিশের কাছে তিনি কোনো জবানবন্দি দেন নাই। রাষ্ট্রপক্ষের ৫নং সাক্ষী আঃ খালেক ও সুলতানপুর নিবাসী যাকে রাষ্ট্রপক্ষ টেন্ডার করে। আসামীপক্ষের জেরায় তিনি বলেন যে, পুলিশ যখন ভিকটিমের বাড়িতে যায় তখন তিনি ওই বাড়িতে গিয়েছিলেন এবং ঘটনার সময় ঘটনাস্থলে আসামী এবং ঐ ভিকটিম একত্রে ছিল। ';
+    const garbled = 'র্য্ভলখ্বী ২০০৮ ঈি ঢ়্ব্লসষ ৪৩ বি ষ্পঔ্বঁব্ভ্র ষ্ল্বখ্বল্বষ ১ বি ্ভযয্বপ্ভ্র ঊন্ক্ষ্ণ ল্বলস্বঁ শম্ঘণ্ট ষ্ঝস্ব ';
+    expect(commonBanglaShare(readable.repeat(3))).toBeGreaterThan(MIN_COMMON_BANGLA_SHARE);
+    expect(commonBanglaShare(garbled.repeat(5))).toBeLessThan(MIN_COMMON_BANGLA_SHARE);
+    expect(commonBanglaShare('দুই শব্দ')).toBe(1); // too short to judge
   });
 });

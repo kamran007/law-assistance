@@ -3,7 +3,7 @@ export { normalizeForHash, normalizeForDisplay, HASH_NORMALIZATION_VERSION } fro
 export { normalizeSectionKey } from './section-key';
 export { hashSectionContent, hashFootnotes } from './hash';
 export { parseFootnoteAction, parseLegalDate, type ParsedFootnote, type FootnoteAction } from './footnote';
-export { looksLikeBijoy, BIJOY_MARK_RATIO, type BijoyEvidence } from './bijoy';
+export { looksLikeBijoy, englishWordShare, BIJOY_MARK_RATIO, ENGLISH_WORD_SHARE, type BijoyEvidence } from './bijoy';
 export { convertBijoyToUnicode, convertBijoyDocument } from './bijoy-convert';
 export { redactContactIds, PHONE_PLACEHOLDER, NID_PLACEHOLDER, type RedactionResult } from './redact';
 export { parseFirDateTime, filingDelay, dhakaToUtc, type FirDateTime, type FirDateTimeFlag, type FilingDelay } from './fir-datetime';

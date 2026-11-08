@@ -119,4 +119,51 @@ describe('parseJudgmentHeader (pdftotext -layout, pages 1–4)', () => {
     expect(parseJudgmentHeader('Present:\nMr. Justice A\n\nNo dates here')).toMatchObject({ decisionDate: null, hearingDates: [] });
     expect(parseJudgmentHeader('Date of Judgment : 31.02.2015')).toMatchObject({ decisionDate: null }); // impossible date
   });
+
+  // Header layouts seen in the full SCOB load (issues 1–20), as `pdftotext -layout` prints them.
+  const date = (text: string) => parseJudgmentHeader(text).decisionDate;
+  const col = (left: string, right: string) => `${left.padEnd(60)}${right}`;
+
+  it('written dates: ordinals, "day of", month first, spaced ordinals', () => {
+    expect(date('Date of Judgment: 11th March, 2015.')).toBe('2015-03-11');
+    expect(date(col('Md. Rahim', 'Judgment on the 14th May, 2015'))).toBe('2015-05-14');
+    expect(date('Date of judgment       :The 18th day of September, 2013')).toBe('2013-09-18');
+    expect(date(col('Ahmed Services Limited', 'Judgment on: The 14 th December, 2014'))).toBe('2014-12-14');
+    expect(date('Judgment on: March 3, 2016')).toBe('2016-03-03');
+  });
+
+  it('label variants: hearing and judgment together, "dated", no space, "and/& judgment on"', () => {
+    expect(date(col('Tejgaon Circle-1, Banani, Dhaka', 'Date of hearing and judgment :    18.06.2015.'))).toBe('2015-06-18');
+    expect(date('Heard and judgment on 4th August, 2015.')).toBe('2015-08-04');
+    expect(date(col('... Opposite Parties', 'Judgment dated: 11.08.2015'))).toBe('2015-08-11');
+    expect(date(col('The State', 'Judgmenton:30.07.2015'))).toBe('2015-07-30');
+    expect(date([col('Secretary, Ministry of Land', 'Heard on: 30.04.2015'), col('Secretariat, Dhaka & others.', 'and Judgment on: 05.05.2015.')].join('\n'))).toBe('2015-05-05');
+    const h = parseJudgmentHeader([col('....Plaintiff -Opposite- parties.', 'Heard on: 25.02.2015 & Judgment on:'), col('', '26.02.2015.')].join('\n'));
+    expect(h).toMatchObject({ decisionDate: '2015-02-26', hearingDates: ['2015-02-25'] });
+  });
+
+  it('values wrapped onto the next line in the same column, label and value in separate cells', () => {
+    const wrapped = [col('', 'Date of judgment       :The 18th September,'), col(' = Versus =', '                    2013')].join('\n');
+    expect(date(wrapped)).toBe('2013-09-18');
+    // Judgment delivered over several days: the last one.
+    expect(date([col('others.', 'Judgment on : 23.02.2015, 25.02.2015,'), col('   ... Respondents', '01.03.2015.')].join('\n'))).toBe('2015-03-01');
+    expect(date(' Date of Judgment.                           :   The 4th November, 2015.')).toBe('2015-11-04');
+  });
+
+  it('numeric oddities: spaces, comma, a space for the separator, two-digit years', () => {
+    expect(date('Judgment on: 03. 12. 2012.')).toBe('2012-12-03');
+    expect(date('Judgment on : 13.02,2014')).toBe('2014-02-13');
+    expect(date('Judgment on 30.01 2017 and 31.01 2017.')).toBe('2017-01-31');
+    expect(date([col('The State', '09.04.2015, 12.04.2015 and Judgment on:'), col('   ...Respondent.', '13.04.15')].join('\n'))).toBe('2015-04-13');
+  });
+
+  it('never takes the lower court\'s date, a body sentence or a hearing-only header', () => {
+    expect(date('(From the judgment and order dated 2.3.2010 passed by the High Court Division)')).toBeNull();
+    expect(date('The High Court Division by its judgment dated 06.03.2013 discharged the Rule.')).toBeNull();
+    expect(date(col('=Versus=', 'Date of hearing : 22-04-2015'))).toBeNull();
+  });
+
+  it('Bangla labels and digits', () => {
+    expect(date(`শুনানি: ১০.০৩.২০১৫\nরা${'য' + String.fromCodePoint(0x09bc)} ঘোষণার তারিখ: ১৮.০৩.২০১৫`)).toBe('2015-03-18');
+  });
 });
