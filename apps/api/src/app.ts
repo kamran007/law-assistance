@@ -69,6 +69,9 @@ declare module 'fastify' {
  * Safety-net limit per client for routes without their own limit. Route-specific limits from
  * TRD §5.5 (OTP, assistant, scan, voice) are set on those routes when they are added.
  */
+/** Methods the web origin may use cross-origin (every method the API routes use). */
+export const CORS_METHODS = ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'] as const;
+
 export const DEFAULT_RATE_LIMIT = { max: 300, timeWindow: '1 minute' } as const;
 
 export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
@@ -115,7 +118,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
     // Swagger UI (/docs) sets its own CSP via `staticCSP`; everything else gets helmet's default.
     contentSecurityPolicy: { useDefaults: true },
   });
-  await app.register(cors, { origin: [config.WEB_ORIGIN], credentials: true });
+  // The plugin's default methods are GET/HEAD/POST only; the web app also edits (PATCH) and deletes.
+  // ETag is exposed so the browser can read versions for If-Match.
+  await app.register(cors, {
+    origin: [config.WEB_ORIGIN],
+    credentials: true,
+    methods: [...CORS_METHODS],
+    exposedHeaders: ['ETag'],
+  });
   await app.register(cookie);
   await app.register(rateLimit, {
     ...DEFAULT_RATE_LIMIT,

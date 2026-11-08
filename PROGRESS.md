@@ -81,7 +81,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | :--- | :--- |
 | `pnpm lint` | ✅ clean |
 | `pnpm typecheck` (config, legal-text, db, api, worker) | ✅ clean |
-| `pnpm test` (unit + web) | ✅ 1050 passed + 7 skipped (32 files; 5 need qpdf/Poppler and run in CI and the worker image, where 7/7 pass; 2 are the opt-in live LLM tests, passed with `RUN_LIVE_LLM=1`) |
+| `pnpm test` (unit + web) | ✅ 1056 passed + 7 skipped (33 files; 5 need qpdf/Poppler and run in CI and the worker image, where 7/7 pass; 2 are the opt-in live LLM tests, passed with `RUN_LIVE_LLM=1`) |
 | Coverage: `legal-text` / worker HTTP + parser | 98% / 96% + 94% statements. `versioning.ts` + `run-scrape.ts` are covered only by the integration test |
 | `pnpm test:integration` (CI, `main` @ `c8d5f1f`) | ✅ db 9/9, worker 10/10 against MySQL 8.4 (Testcontainers) |
 | Semgrep (p/typescript, p/nodejsscan, p/secrets) | ✅ 0 findings locally after `fix/semgrep-findings`. Was 2 warnings: regex on parser input (tightened, linear-time, annotated) and `Math.random` retry jitter (now `crypto.randomInt`) |
@@ -188,6 +188,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-04 | API Zod schemas live in `apps/api/src/modules/*/schemas.ts` for now | Move to `packages/contracts` when the web client (WEB-01) consumes them; no second consumer yet |
 | 2026-11-08 | `packages/contracts` = OpenAPI generated from the API's route schemas (+ openapi-fetch types), not shared Zod modules | One source of truth that also serves Flutter (MOB) via `openapi.json`; a unit test fails on drift. Supersedes the 2026-11-04 plan to move the Zod schemas |
 | 2026-11-08 | Web locale always in the URL (`/bn`, `/en`), Bangla default | Public law-library pages must be cacheable and indexable per language (ISR / CDN) |
+| 2026-11-08 | CORS allows every method the API uses (GET, HEAD, POST, PATCH, DELETE) and exposes ETag; a unit test compares the list with the OpenAPI routes | @fastify/cors defaults to GET/HEAD/POST: the browser blocked profile setup (PATCH /me) as a network error while server-side tests passed (reported by the owner) |
 | 2026-11-08 | Uploads go browser → bucket with presigned PUTs (XHR for progress); the bucket allows PUT from the web origin only | The API never proxies file bytes; the CORS rule is the narrowest that lets the browser upload |
 | 2026-11-08 | Document status: SSE per processing document, polling every 5 s as fallback | Live progress without a second protocol; polling keeps it working behind proxies that break streams |
 | 2026-11-08 | Web refreshes are single-flight per tab and serialised across tabs with the Web Locks API | The API treats a reused refresh token as theft and revokes the session; two tabs refreshing at once would sign the user out |
