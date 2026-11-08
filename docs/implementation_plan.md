@@ -213,8 +213,8 @@ These items block engineering milestones. Start them in **Week 1**.
 
 ### Dictation & Export
 - [ ] **BE-31** Dictation WebSocket: auth-first frame, PCM/Opus input, STT stream rotation with overlap de-duplication, interim/final/command frames, Redis concurrency limits, audio tee to S3 (TRD §5.3, §9.2)
-- [ ] **BE-32** Draft templates (Lawyer: bail petition, legal notice, argument notes, witness summary, plaint; Judge: bench notes, order sheet, issue-framing, judgment summary) + `POST /cases/{id}/drafts`
-- [ ] **BE-33** Draft PATCH with last-write-wins + `artifact_revisions` preservation + `X-Conflict-Preserved` (TRD §5.4)
+- [x] **BE-32** Draft templates (Lawyer: bail petition, legal notice, argument notes, witness summary, plaint; Judge: bench notes, order sheet, issue-framing, judgment summary) + `POST /cases/{id}/drafts`
+- [x] **BE-33** Draft PATCH with last-write-wins + `artifact_revisions` preservation + `X-Conflict-Preserved` (TRD §5.4)
 - [ ] **BE-34** Export worker: `docx` builder + Playwright `page.pdf()` with Bangla fonts, presigned download, 24 h lifecycle (TRD §10) · Bangla rendering snapshot tests
 - [ ] **BE-35** GD templates + guided voice-fill API for Citizens (App Flow §11)
 - [ ] **WEB-10** TipTap draft editor + dictation mode (AudioWorklet 16 kHz PCM, interim decorations, corrections underlined with undo, autosave indicator) (App Flow §10)

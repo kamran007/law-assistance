@@ -14,7 +14,7 @@ import { startFullApp, type FullApp } from './helpers/full-app';
 let f: FullApp;
 let a: { userId: string; token: string };
 let b: { userId: string; token: string };
-const ids = { bCase: '', bCaseConv: '', bGeneralConv: '', bArtifact: '', bKey: '', aCase: '' };
+const ids = { bCase: '', bCaseConv: '', bGeneralConv: '', bArtifact: '', bKey: '', aCase: '', bDraft: '' };
 
 beforeAll(async () => {
   f = await startFullApp();
@@ -30,6 +30,7 @@ beforeAll(async () => {
   ids.bKey = uploadKey(b.userId, ids.bCase, ids.bArtifact, 'application/pdf');
   f.storage.put(ids.bKey, SAMPLES.pdf, 'application/pdf');
   await repoB.artifacts.createUpload({ artifactId: ids.bArtifact, caseFileId: ids.bCase, artifactType: 'FIR_SCAN', fileStorageKey: ids.bKey, mimeType: 'application/pdf' });
+  ids.bDraft = (await repoB.artifacts.createDraft({ artifactId: newId(), caseFileId: ids.bCase, templateKey: 'BLANK', html: '<p>B secret draft</p>' }))!.artifactId;
   ids.aCase = (await scoped(f.db, a.userId).caseFiles.create({ title: 'A own case' }, { withConversation: false })).caseFileId;
 }, 180_000);
 afterAll(() => f?.stop());
@@ -58,6 +59,10 @@ const attacks: Record<string, Attack> = {
   'PATCH /api/v1/cases/:id/artifacts/:art_id': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}`, payload: { police_station: 'pwned' }, headers: { 'if-match': '"1"' } },
   'POST /api/v1/cases/:id/artifacts/:art_id/reanalyze': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}/reanalyze` },
   'GET /api/v1/cases/:id/artifacts/:art_id/events': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}/events` },
+  'POST /api/v1/cases/:id/drafts': { url: () => `/cases/${ids.bCase}/drafts`, payload: { template_key: 'BLANK' } },
+  'GET /api/v1/cases/:id/drafts/:art_id': { url: () => `/cases/${ids.bCase}/drafts/${ids.bDraft}` },
+  'PATCH /api/v1/cases/:id/drafts/:art_id': { url: () => `/cases/${ids.bCase}/drafts/${ids.bDraft}`, payload: { html: '<p>pwned</p>' }, headers: { 'if-match': '"1"' } },
+  'GET /api/v1/cases/:id/drafts/:art_id/revisions': { url: () => `/cases/${ids.bCase}/drafts/${ids.bDraft}/revisions` },
   'GET /api/v1/cases/:id/artifacts/:art_id/original': { url: () => `/cases/${ids.bCase}/artifacts/${ids.bArtifact}/original` },
 };
 
@@ -139,5 +144,6 @@ describe('cross-tenant access', () => {
     expect(await repoB.conversations.findById(ids.bCaseConv)).not.toBeNull();
     expect((await repoB.messages.byConversation(ids.bGeneralConv))!.map((m) => m.content)).toEqual(['B secret question']);
     expect(await repoB.artifacts.findById(ids.bArtifact)).toMatchObject({ caseFileId: ids.bCase, ownerUserId: b.userId, deletedAt: null });
+    expect(await repoB.artifacts.findById(ids.bDraft)).toMatchObject({ editableDocumentHtml: '<p>B secret draft</p>', version: 1 });
   });
 });

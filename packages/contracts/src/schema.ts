@@ -1338,6 +1338,7 @@ export type paths = {
                             artifact_id: string;
                             case_id: string;
                             artifact_type: string;
+                            template_key: string | null;
                             /** @enum {string|null} */
                             processing_status: "UPLOADED" | "OCR" | "EXTRACTING" | "SCHEDULE_LOOKUP" | "ANALYZING" | "READY" | "FAILED" | null;
                             processing_error: string | null;
@@ -1388,6 +1389,7 @@ export type paths = {
                                 artifact_id: string;
                                 case_id: string;
                                 artifact_type: string;
+                                template_key: string | null;
                                 /** @enum {string|null} */
                                 processing_status: "UPLOADED" | "OCR" | "EXTRACTING" | "SCHEDULE_LOOKUP" | "ANALYZING" | "READY" | "FAILED" | null;
                                 processing_error: string | null;
@@ -1441,6 +1443,7 @@ export type paths = {
                             artifact_id: string;
                             case_id: string;
                             artifact_type: string;
+                            template_key: string | null;
                             /** @enum {string|null} */
                             processing_status: "UPLOADED" | "OCR" | "EXTRACTING" | "SCHEDULE_LOOKUP" | "ANALYZING" | "READY" | "FAILED" | null;
                             processing_error: string | null;
@@ -1539,6 +1542,7 @@ export type paths = {
                             artifact_id: string;
                             case_id: string;
                             artifact_type: string;
+                            template_key: string | null;
                             /** @enum {string|null} */
                             processing_status: "UPLOADED" | "OCR" | "EXTRACTING" | "SCHEDULE_LOOKUP" | "ANALYZING" | "READY" | "FAILED" | null;
                             processing_error: string | null;
@@ -1636,6 +1640,7 @@ export type paths = {
                             artifact_id: string;
                             case_id: string;
                             artifact_type: string;
+                            template_key: string | null;
                             /** @enum {string|null} */
                             processing_status: "UPLOADED" | "OCR" | "EXTRACTING" | "SCHEDULE_LOOKUP" | "ANALYZING" | "READY" | "FAILED" | null;
                             processing_error: string | null;
@@ -1758,6 +1763,238 @@ export type paths = {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/draft-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Draft templates for my role (Lawyer or Judge) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                key: string;
+                                title_bn: string;
+                                title_en: string;
+                                headings_bn: string[];
+                                headings_en: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a draft from a template, headings pre-filled with the case number and court */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        template_key: string;
+                        /**
+                         * @default BN
+                         * @enum {string}
+                         */
+                        language?: "BN" | "EN";
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            artifact_id: string;
+                            case_id: string;
+                            template_key: string | null;
+                            html: string;
+                            version: number;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cases/{id}/drafts/{art_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A draft with its HTML */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    art_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            artifact_id: string;
+                            case_id: string;
+                            template_key: string | null;
+                            html: string;
+                            version: number;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Save draft HTML (If-Match). On a version mismatch the newer server text is preserved and X-Conflict-Preserved names it */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    art_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        html: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            artifact_id: string;
+                            case_id: string;
+                            template_key: string | null;
+                            html: string;
+                            version: number;
+                            created_at: string;
+                            updated_at: string;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/cases/{id}/drafts/{art_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Earlier versions of a draft that were preserved on save conflicts */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    art_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                revision_id: string;
+                                version: number;
+                                html: string;
+                                created_by_device: string | null;
+                                created_at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;

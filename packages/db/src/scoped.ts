@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { caseArtifacts, caseFiles, conversations, deviceTokens, messages, newId, type DEVICE_PLATFORMS } from './schema/index';
+import { artifactRevisions, caseArtifacts, caseFiles, conversations, deviceTokens, messages, newId, type DEVICE_PLATFORMS } from './schema/index';
 
 export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
 export const MAX_DEVICES_PER_USER = 10;
@@ -286,6 +286,70 @@ export function scoped(db: Db, userId: string) {
         const existing = await artifactsRepo.findById(input.artifactId);
         return existing && existing.caseFileId === input.caseFileId ? { row: existing, created: false } : null;
       }
+    },
+
+    /** A new draft from a template (App Flow §10, BE-32). Null if the case isn't this user's. */
+    async createDraft(input: { artifactId: string; caseFileId: string; templateKey: string; html: string }): Promise<CaseArtifact | null> {
+      if (!(await caseFilesRepo.findById(input.caseFileId))) return null;
+      await db.insert(caseArtifacts).values({
+        artifactId: input.artifactId,
+        caseFileId: input.caseFileId,
+        ownerUserId: userId,
+        artifactType: 'VOICE_DICTATION_DRAFT',
+        templateKey: input.templateKey,
+        editableDocumentHtml: input.html,
+      });
+      return artifactsRepo.findById(input.artifactId);
+    },
+
+    /**
+     * Saves draft HTML (TRD §5.4, BE-33): last write wins, but nothing is lost. If the client edited
+     * an older version, the server's current text is first copied into `artifact_revisions` and
+     * its id returned (`X-Conflict-Preserved`). One transaction, row locked.
+     */
+    async saveDraft(
+      artifactId: string,
+      expectedVersion: number,
+      html: string,
+      device: string | null,
+    ): Promise<{ status: 'ok'; row: CaseArtifact; preservedRevisionId: string | null } | { status: 'not_found' } | { status: 'not_a_draft' }> {
+      return db.transaction(async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(caseArtifacts)
+          .where(and(eq(caseArtifacts.artifactId, artifactId), eq(caseArtifacts.ownerUserId, userId), isNull(caseArtifacts.deletedAt)))
+          .for('update');
+        if (!current) return { status: 'not_found' as const };
+        if (current.artifactType !== 'VOICE_DICTATION_DRAFT') return { status: 'not_a_draft' as const };
+        let preservedRevisionId: string | null = null;
+        if (current.version !== expectedVersion) {
+          preservedRevisionId = newId();
+          await tx.insert(artifactRevisions).values({
+            revisionId: preservedRevisionId,
+            artifactId,
+            ownerUserId: userId,
+            version: current.version,
+            editableDocumentHtml: current.editableDocumentHtml,
+            createdByDevice: device,
+          });
+        }
+        await tx
+          .update(caseArtifacts)
+          .set({ editableDocumentHtml: html, version: current.version + 1 })
+          .where(and(eq(caseArtifacts.artifactId, artifactId), eq(caseArtifacts.ownerUserId, userId)));
+        const [row] = await tx.select().from(caseArtifacts).where(eq(caseArtifacts.artifactId, artifactId));
+        return { status: 'ok' as const, row: row!, preservedRevisionId };
+      });
+    },
+
+    /** Preserved earlier versions of a draft, newest first (owner only). */
+    async draftRevisions(artifactId: string): Promise<(typeof artifactRevisions.$inferSelect)[] | null> {
+      if (!(await artifactsRepo.findById(artifactId))) return null;
+      return db
+        .select()
+        .from(artifactRevisions)
+        .where(and(eq(artifactRevisions.artifactId, artifactId), eq(artifactRevisions.ownerUserId, userId)))
+        .orderBy(desc(artifactRevisions.createdAt));
     },
 
     /**

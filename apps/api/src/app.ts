@@ -20,6 +20,7 @@ import { caseRoutes, type CaseRoutesDeps } from './modules/cases/routes';
 import { conversationRoutes, type ConversationRoutesDeps } from './modules/conversations/routes';
 import { deviceRoutes, type DeviceRoutesDeps } from './modules/devices/routes';
 import { documentRoutes, type DocumentRoutesDeps } from './modules/documents/routes';
+import { draftRoutes, type DraftRoutesDeps } from './modules/drafts/routes';
 import { statuteRoutes, type StatuteRoutesDeps } from './modules/statutes/routes';
 import { ApiError, problem } from './problem';
 
@@ -39,6 +40,8 @@ export interface AppDeps {
   /** Document upload, registration and artifact reads (BE-21). */
   documents?: DocumentRoutesDeps;
   devices?: DeviceRoutesDeps;
+  /** Draft templates and draft saving (BE-32/33). */
+  drafts?: DraftRoutesDeps;
   /** Shared rate-limit counters across API tasks (TRD §5.5). In-memory when omitted. */
   rateLimitRedis?: Redis;
 }
@@ -124,7 +127,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
     origin: [config.WEB_ORIGIN],
     credentials: true,
     methods: [...CORS_METHODS],
-    exposedHeaders: ['ETag'],
+    exposedHeaders: ['ETag', 'X-Conflict-Preserved'],
   });
   await app.register(cookie);
   await app.register(rateLimit, {
@@ -185,6 +188,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}) {
   if (deps.conversations) await app.register(conversationRoutes(deps.conversations), { prefix: API_PREFIX });
   if (deps.documents) await app.register(documentRoutes(deps.documents), { prefix: API_PREFIX });
   if (deps.devices) await app.register(deviceRoutes(deps.devices), { prefix: API_PREFIX });
+  if (deps.drafts) await app.register(draftRoutes(deps.drafts), { prefix: API_PREFIX });
 
   return app;
 }

@@ -22,6 +22,7 @@ const artifact = (status: string, over: object = {}): Artifact => ({
   artifact_id: ART,
   case_id: CASE,
   artifact_type: 'FIR_SCAN',
+  template_key: null,
   processing_status: status as Artifact['processing_status'],
   processing_error: null,
   mime_type: 'application/pdf',

@@ -23,6 +23,7 @@ export async function buildOpenApiSpec(): Promise<Record<string, unknown>> {
     auth: { service: new AuthService({ db, tokens, sender: { send: unused }, otpKey: 'k'.repeat(32) }), authenticate, secureCookies: true },
     cases: { db, authenticate, today: () => '2026-01-01' },
     devices: { db, authenticate },
+    drafts: { db, authenticate },
     conversations: { db, authenticate },
     documents: {
       db,

@@ -65,6 +65,7 @@ const app = await buildApp(config, {
   },
   cases: { db, authenticate, today: dhakaToday },
   devices: { db, authenticate },
+  drafts: { db, authenticate },
   conversations: { db, authenticate },
   documents: {
     db,

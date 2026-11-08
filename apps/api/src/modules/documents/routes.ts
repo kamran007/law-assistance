@@ -48,6 +48,8 @@ const artifact = z.object({
   artifact_id: z.string(),
   case_id: z.string(),
   artifact_type: z.string(),
+  /** Drafts only: the template it started from. */
+  template_key: z.string().nullable(),
   processing_status: z.enum(['UPLOADED', 'OCR', 'EXTRACTING', 'SCHEDULE_LOOKUP', 'ANALYZING', 'READY', 'FAILED']).nullable(),
   processing_error: z.string().nullable(),
   mime_type: z.string().nullable(),
@@ -62,6 +64,7 @@ const toArtifact = (a: CaseArtifact): z.infer<typeof artifact> => ({
   artifact_id: a.artifactId,
   case_id: a.caseFileId,
   artifact_type: a.artifactType,
+  template_key: a.templateKey,
   processing_status: a.processingStatus,
   processing_error: a.processingError,
   mime_type: a.mimeType,
