@@ -99,6 +99,18 @@ describe('parseActPrint: English pre-1987 Act (fixture in the real markup)', () 
     expect(broken.warnings).toEqual(expect.arrayContaining(['title not found', 'section block #0: no section number', 'no sections parsed']));
   });
 
+  it('a one-section Act whose only section has no number is stored as section 1 (The Districts Act, 1836)', () => {
+    const html = readFileSync(new URL('./fixtures/act-print-1-single-section.html', import.meta.url), 'utf8');
+    const act = parseActPrint(html, { bdlawsActId: 1, sourceUrl: 'http://bdlaws.minlaw.gov.bd/act-print-1.html' }, cfg);
+    expect(act.title).toBe('The Districts Act, 1836');
+    expect(act.sections).toHaveLength(1);
+    expect(act.sections[0]).toMatchObject({ sectionNumber: '1', normalizedSectionKey: '1', marginalHeading: 'Power to create new Districts' });
+    expect(act.sections[0]!.contentBody).toContain('It shall be lawful for the');
+    expect(act.sections[0]!.footnotes.length).toBeGreaterThan(0);
+    expect(act.warnings).toContain('single unnumbered section stored as section 1');
+    expect(act.warnings).not.toContain('no sections parsed');
+  });
+
   it('recognises a repealed Act from the row classes, or from the title text', () => {
     const rows = '<div class="row lineremoves repealed"><div class="txt-head">Short title</div><div class="txt-details">1. This Act may be called the Old Act.</div></div>';
     expect(parseActPrint(rows, meta, cfg).isRepealed).toBe(true);

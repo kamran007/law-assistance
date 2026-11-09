@@ -114,6 +114,8 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
   let chapter: string | null = null;
   let sectionBlocks = 0;
   let repealedBlocks = 0;
+  /** Blocks with text but no number and no section above them (a one-section Act has exactly one). */
+  const unnumbered: SectionDraft[] = [];
 
   $(`${sel.chapter}, ${sel.section}`).each((i, el) => {
     const node = $(el);
@@ -182,6 +184,7 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
         current.markers.push(...markers);
       } else if (!PREAMBLE_HEADING.test(hashHeading)) {
         warnings.push(`section block #${i}: no section number`);
+        unnumbered.push({ sectionNumber: '1', key: '1', chapter, heading, hashHeadings: [hashHeading], displayLines: [...displayLines], hashLines: [...hashLines], markers: [...markers] });
       }
       return;
     }
@@ -209,6 +212,12 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
     }
   });
 
+  // A one-section Act prints its only section without a number (The Districts Act, 1836): it is
+  // section 1. Anything else unnumbered is reported, never guessed.
+  if (title && !drafts.length && unnumbered.length === 1) {
+    drafts.push(unnumbered[0]!);
+    warnings.splice(warnings.findIndex((w) => w.endsWith(': no section number')), 1, 'single unnumbered section stored as section 1');
+  }
   const sections = drafts.map((d) => finishSection(d, footnoteTexts, warnings));
   if (!sections.length) warnings.push('no sections parsed');
 
@@ -230,6 +239,7 @@ export function parseActPrint(html: string, meta: { bdlawsActId: number; sourceU
     // usually doesn't say so. The text pattern is kept as a fallback.
     isRepealed:
       (sectionBlocks > 0 && repealedBlocks === sectionBlocks) ||
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- the pattern comes from the scraper's source config (operator-controlled), not request input; it runs on one title + preamble
       new RegExp(cfg.repealedPattern, 'iu').test(`${title} ${preamble}`),
     sections,
     warnings,
