@@ -73,7 +73,7 @@ export function createWorkerContext() {
   };
 
   const qdrant = createQdrantClient({ url: cfg.QDRANT_URL, apiKey: cfg.QDRANT_API_KEY });
-  const embedder = new TeiEmbeddingProvider({ url: cfg.TEI_EMBED_URL, model: cfg.EMBEDDING_MODEL });
+  const embedder = new TeiEmbeddingProvider({ url: cfg.TEI_EMBED_URL, model: cfg.EMBEDDING_MODEL, batchSize: cfg.TEI_BATCH_SIZE, timeoutMs: cfg.TEI_TIMEOUT_MS });
   const indexer = new SectionIndexer({ db, embedder, index: new QdrantChunkIndex(qdrant, cfg.QDRANT_COLLECTION) });
   const judgmentIndexer = new JudgmentIndexer({ db, embedder, index: new QdrantJudgmentIndex(qdrant, cfg.QDRANT_JUDGMENT_COLLECTION) });
 

@@ -33,6 +33,10 @@ export const envSchema = z.object({
   QDRANT_URL: z.string().url().default('http://localhost:6333'),
   QDRANT_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   TEI_EMBED_URL: z.string().url().default('http://localhost:8081'),
+  /** Texts per /embed request (TRD §6.4: 64). On a CPU-only TEI a 64-text batch takes minutes; use ~8. */
+  TEI_BATCH_SIZE: z.coerce.number().int().min(1).max(256).default(64),
+  /** Per-request timeout for TEI calls. */
+  TEI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900_000).default(60_000),
   /** Stored in section_chunks.embedding_model; changing it (e.g. a new revision) means a reindex. */
   EMBEDDING_MODEL: z.string().min(1).default('BAAI/bge-m3'),
   /** Qdrant ALIAS used for search; physical collections are <alias>_<timestamp> (TRD §4.4). */

@@ -2,6 +2,7 @@ import { parseArgs } from 'node:util';
 import { createWorkerContext } from './context';
 import { ensureChunkCollection, ensureJudgmentCollection, reindexAll, reindexJudgments } from './index/collection';
 import { drainOutbox } from './index/outbox';
+import { priorityBackfill } from './index/priority-backfill';
 import { runScrape, syncFromSnapshot } from './scrape/run-scrape';
 import { runScobCrawl } from './scob/crawl';
 import { decodeMixedUtf8 } from './scob/decode';
@@ -19,6 +20,7 @@ import { S3DocumentObjects } from './scan/objects';
  *   scrape -- --setup-index                             create Qdrant collection + alias + payload indexes
  *   scrape -- --drain-outbox                            embed/index pending outbox events now
  *   scrape -- --reindex-all [--keep-previous]           rebuild the collection, swap the alias
+ *   scrape -- --index-priority                          embed judgments + dictionary Acts first (slow CPU TEI); the outbox does the rest
  *   scrape -- --reindex-judgments [--keep-previous]     rebuild judgment_chunks from MySQL (SCOB backfill), swap the alias
  *   scrape -- --scob [--issues 19,20] [--all]           SCOB crawl: queue judgments not stored yet (all with --all)
  *   scrape -- --scob-backfill                           first full SCOB load (every issue)
@@ -40,6 +42,7 @@ const { values } = parseArgs({
     'drain-outbox': { type: 'boolean', default: false },
     'reindex-all': { type: 'boolean', default: false },
     'reindex-judgments': { type: 'boolean', default: false },
+    'index-priority': { type: 'boolean', default: false },
     'keep-previous': { type: 'boolean', default: false },
     scob: { type: 'boolean', default: false },
     'scob-backfill': { type: 'boolean', default: false },
@@ -61,6 +64,8 @@ try {
     });
   } else if (values['drain-outbox']) {
     print(await drainOutbox({ db: ctx.db, indexer: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log }));
+  } else if (values['index-priority']) {
+    print(await priorityBackfill({ db: ctx.db, sections: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log }));
   } else if (values['reindex-judgments']) {
     print(
       await reindexJudgments(

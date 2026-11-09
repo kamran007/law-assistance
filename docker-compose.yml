@@ -81,7 +81,10 @@ services:
   tei-embed:
     profiles: [ml]
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
-    command: ['--model-id', 'BAAI/bge-m3', '--port', '80']
+    # Default max-batch-tokens (16384) ran out of memory warming up in an 8 GB Docker VM. Chunks are
+    # ≤ ~500 tokens, so 8192 per batch is plenty; the client sends 64 texts per request (TRD §6.4).
+    command: ['--model-id', 'BAAI/bge-m3', '--port', '80', '--max-batch-tokens', '2048', '--auto-truncate', '--max-client-batch-size', '64']
+    mem_limit: 6g
     ports: ['8081:80']
     volumes: [tei-cache:/data]
 
