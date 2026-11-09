@@ -53,6 +53,31 @@ services:
         echo 's3.bucket.create -name lawassist-dev' | weed shell -master=s3:9333
     restart: 'no'
 
+  # Background worker (scraper schedules, SCOB, outbox indexing, scan pipeline) in its own image,
+  # which has qpdf + Poppler. `docker compose --profile worker up -d --build worker`.
+  # Reads .env; only the hosts change to the compose services (credentials are the local ones above).
+  worker:
+    profiles: [worker]
+    build: { context: ., dockerfile: apps/worker/Dockerfile, target: runtime }
+    image: lawassist-worker
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: mysql://root:root@mysql:3306/lawassist
+      SCRAPER_DATABASE_URL: ''
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      S3_ENDPOINT: http://s3:8333
+      TEI_EMBED_URL: http://tei-embed:80
+      TEI_RERANK_URL: http://tei-rerank:80
+      FCM_SERVICE_ACCOUNT_FILE: /secrets/firebase-service-account.json
+    volumes: ['./secrets:/secrets:ro']
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      s3: { condition: service_started }
+    restart: unless-stopped
+
   tei-embed:
     profiles: [ml]
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8

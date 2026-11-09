@@ -166,6 +166,18 @@ describe('JUDGMENT_UPSERTED → judgment_chunks → Qdrant (JUD-06)', () => {
     expect(await chunksOf(j3)).toEqual([]);
   });
 
+  it('an unreachable embedding server skips the run without using up any event attempts', async () => {
+    const j = await addJudgment(9);
+    await event(j);
+    expect(await drainOutbox({ ...outbox(), ready: async () => false })).toEqual({ processed: 0, failed: 0, skipped: true });
+    const [row] = await db.select().from(outboxEvents).where(and(eq(outboxEvents.aggregateId, j), isNull(outboxEvents.processedAt)));
+    expect(row).toMatchObject({ attempts: 0, lastError: null });
+    expect(await drainOutbox({ ...outbox(), ready: async () => true })).toMatchObject({ processed: 1, failed: 0 });
+    await db.delete(judgments).where(eq(judgments.judgmentId, j)); // keep the later counts unchanged
+    await event(j, 'JUDGMENT_REMOVED');
+    await drainOutbox(outbox());
+  });
+
   it('JUDGMENT_REMOVED drops the chunks; without a judgment indexer the events are left for later', async () => {
     const j4 = await addJudgment(4);
     await event(j4);

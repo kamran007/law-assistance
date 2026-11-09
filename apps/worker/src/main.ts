@@ -83,6 +83,15 @@ async function main() {
     lockDuration: 5 * 60_000,
   });
 
+  // The outbox pauses while TEI is unreachable; log only when that changes, not every 15 s.
+  let teiUp: boolean | null = null;
+  const embedderReady = async () => {
+    const ok = await ctx.embedder.ready();
+    if (ok !== teiUp) ctx.log[ok ? 'info' : 'warn']({ embedder: ok }, ok ? 'embedding server reachable: outbox indexing runs' : 'embedding server not reachable: outbox indexing paused');
+    teiUp = ok;
+    return ok;
+  };
+
   const outboxQueue = new Queue(OUTBOX_QUEUE, { connection });
   await outboxQueue.upsertJobScheduler(
     'outbox-drain',
@@ -96,7 +105,7 @@ async function main() {
     // A full crawl of ~1,480 Acts at 1 req/s takes hours; keep the lock alive meanwhile.
     { connection, concurrency: 1, lockDuration: 10 * 60_000 },
   );
-  const outboxWorker = new Worker(OUTBOX_QUEUE, async () => drainOutbox({ db: ctx.db, indexer: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log }), {
+  const outboxWorker = new Worker(OUTBOX_QUEUE, async () => drainOutbox({ db: ctx.db, indexer: ctx.indexer, judgments: ctx.judgmentIndexer, log: ctx.log, ready: embedderReady }), {
     connection,
     concurrency: 1,
     lockDuration: 5 * 60_000,
@@ -141,7 +150,7 @@ async function main() {
   ] as const) {
     w.on('failed', (job, err) => ctx.log.error({ queue: name, jobId: job?.id, attempts: job?.attemptsMade, err: err.message }, 'job failed'));
   }
-  ctx.log.info({ queues: [SCRAPE_QUEUE, OUTBOX_QUEUE, SCAN_QUEUE, ANALYSIS_QUEUE] }, 'worker started');
+  ctx.log.info({ queues: [SCRAPE_QUEUE, OUTBOX_QUEUE, SCAN_QUEUE, ANALYSIS_QUEUE, SCOB_QUEUE, SCOB_JUDGMENT_QUEUE], scobWeekly: ctx.cfg.SCOB_CRAWL_ENABLED }, 'worker started');
 
   const shutdown = async () => {
     ctx.log.info({}, 'shutting down');

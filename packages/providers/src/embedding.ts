@@ -39,6 +39,7 @@ export class TeiEmbeddingProvider implements EmbeddingProvider {
   readonly model: string;
   readonly dimensions: number;
   private readonly endpoint: string;
+  private readonly healthUrl: string;
   private readonly batchSize: number;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
@@ -49,11 +50,25 @@ export class TeiEmbeddingProvider implements EmbeddingProvider {
     this.model = opts.model;
     this.dimensions = opts.dimensions ?? 1024;
     this.endpoint = new URL('/embed', opts.url).toString();
+    this.healthUrl = new URL('/health', opts.url).toString();
     this.batchSize = opts.batchSize ?? 64;
     this.timeoutMs = opts.timeoutMs ?? 60_000;
     this.maxRetries = opts.maxRetries ?? 3;
     this.doFetch = opts.fetch ?? (globalThis.fetch as unknown as EmbedFetch);
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  /**
+   * True when TEI answers its health check: callers skip work while the model server is down
+   * instead of counting failures against each item (the outbox would otherwise park every event).
+   */
+  async ready(timeoutMs = 3000): Promise<boolean> {
+    try {
+      const res = await fetch(this.healthUrl, { signal: AbortSignal.timeout(timeoutMs) });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
 
   async embed(texts: readonly string[]): Promise<number[][]> {

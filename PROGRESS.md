@@ -211,6 +211,7 @@ Added 2026-11-04 (SRS §4.4, TRD §6A, App Flow §7.3). Source: Supreme Court On
 | 2026-11-08 | Bijoy conversion needs non-English text, not just a Bijoy font in the PDF | English judgments embed SutonnyMJ for a quoted line; converting them destroyed the English text |
 | 2026-11-08 | A judgment that only states a hearing date keeps decision_date NULL | The decision can be weeks later; a wrong date misleads more than a missing one (EVAL-10 / LLM fallback / admin entry fill the rest) |
 | 2026-11-08 | Acts, case-law results and "Judgments on this section" are listed newest first in the web view, search results included (owner's request); a "Sort: Best match" option is next to the search box. Searches now require every typed word (FULLTEXT BOOLEAN +word), so newest-first lists only real matches | Replaces TRD §5.1 "AD before HCD" for section judgments. Undated judgments are placed by their bulletin year; equal dates: later issue, AD before HCD |
+| 2026-11-09 | Weekly SCOB check switched on locally (`SCOB_CRAWL_ENABLED=true`, owner's go-ahead) and the worker runs as the compose `worker` service (its image has qpdf + Poppler; on the Windows host new judgments would fail to extract) | Keeps laws (nightly 02:00, full Fri 03:00 Dhaka) and judgments (Sat 04:00 Dhaka) current. The outbox pauses while TEI is unreachable without using event attempts, so the 49k pending index events wait intact |
 
 ## Next steps (in order)
 

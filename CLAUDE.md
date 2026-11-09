@@ -26,7 +26,7 @@ AI: Anthropic via `@ai-sdk/anthropic` with `ANTHROPIC_BASE_URL` (relay) and `ANT
 
 ## Commands
 - `pnpm install` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (unit + web jsdom) · `pnpm test:integration` (needs Docker)
-- `docker compose up -d` (add `--profile ml` for the TEI embedding/reranker containers)
+- `docker compose up -d` (add `--profile ml` for the TEI embedding/reranker containers; `docker compose --profile worker up -d --build worker` runs the background worker with qpdf/Poppler)
 - `pnpm db:generate` (after schema changes) · `pnpm db:migrate`
 - `pnpm openapi` after changing API route schemas (regenerates `packages/contracts`; a test fails on drift)
 - `pnpm dev:web` (Next.js on :3001) · `pnpm --filter @lawassist/web build` (while `dev:web` runs, build with `NEXT_DIST_DIR=.next-verify` so the two don't share `.next`)

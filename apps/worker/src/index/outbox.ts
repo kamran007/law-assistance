@@ -23,6 +23,11 @@ export interface OutboxDeps {
   indexer: SectionIndexer;
   judgments?: JudgmentIndexer;
   log: Log;
+  /**
+   * Embedding server reachable? When it says no, the run is skipped without touching any event, so
+   * an outage (TEI not started, models not downloaded) never uses up events' attempts.
+   */
+  ready?: () => Promise<boolean>;
 }
 
 export interface OutboxRunResult {
@@ -119,7 +124,10 @@ export async function processOutboxBatch(
 export async function drainOutbox(
   deps: OutboxDeps,
   opts: { batchSize?: number; maxBatches?: number } = {},
-): Promise<{ processed: number; failed: number }> {
+): Promise<{ processed: number; failed: number; skipped?: true }> {
+  if (deps.ready && !(await deps.ready())) {
+    return { processed: 0, failed: 0, skipped: true };
+  }
   let processed = 0;
   let failed = 0;
   for (let i = 0; i < (opts.maxBatches ?? 50); i++) {
